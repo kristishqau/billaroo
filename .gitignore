@@ -74,4 +74,4 @@ server/**/obj/
 # Env/config
 .env
 .env.*
-server/**/appsettings.*.json
+server/appsettings.json
