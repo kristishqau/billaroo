@@ -75,3 +75,4 @@ server/**/obj/
 .env
 .env.*
 server/appsettings.json
+server/appsettings.Development.json
