@@ -31,6 +31,9 @@ artifacts/
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
 
+# Visual Studio cache
+.vs/
+
 # NuGet Packages
 *.nupkg
 # NuGet Symbol Packages
