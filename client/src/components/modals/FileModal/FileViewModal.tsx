@@ -17,14 +17,16 @@ import {
 } from 'lucide-react';
 
 // File types enum matching the backend
-export enum FileType {
-  Document = 0,
-  Image = 1,
-  Video = 2,
-  Audio = 3,
-  Archive = 4,
-  Other = 5
-}
+export const FileType = {
+  Document: 0,
+  Image: 1,
+  Video: 2,
+  Audio: 3,
+  Archive: 4,
+  Other: 5
+} as const;
+
+export type FileType = typeof FileType[keyof typeof FileType];
 
 export type ProjectFile = {
   id: number;
