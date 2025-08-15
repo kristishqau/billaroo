@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import axios from '../api/axios';
 
 interface AvailabilityResponse {
-  isUsernameAvailable: boolean;
-  isEmailAvailable: boolean;
+  isUsernameAvailable?: boolean;
+  isEmailAvailable?: boolean;
   usernameMessage?: string;
   emailMessage?: string;
 }
 
-export const useAvailabilityCheck = (username: string, email: string) => {
+export function useAvailabilityCheck(username: string, email: string, delay: number = 500) {
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -19,28 +19,30 @@ export const useAvailabilityCheck = (username: string, email: string) => {
         return;
       }
 
-      // Only check if username is at least 3 chars or email looks like email
-      if (username && username.length < 3) return;
-      if (email && !email.includes('@')) return;
+      if (username && username.length < 3 && email && email.length < 3) {
+        return;
+      }
 
       setLoading(true);
+      
       try {
         const response = await axios.post('/Auth/check-availability', {
-          username: username || undefined,
-          email: email || undefined
+          username: username.length >= 3 ? username : undefined,
+          email: email.includes('@') && email.length > 3 ? email : undefined
         });
+        
         setAvailability(response.data);
       } catch (error) {
-        console.error('Availability check error:', error);
+        console.error('Availability check failed:', error);
         setAvailability(null);
       } finally {
         setLoading(false);
       }
     };
 
-    const timeoutId = setTimeout(checkAvailability, 500); // Debounce
+    const timeoutId = setTimeout(checkAvailability, delay);
     return () => clearTimeout(timeoutId);
-  }, [username, email]);
+  }, [username, email, delay]);
 
   return { availability, loading };
-};
+}
