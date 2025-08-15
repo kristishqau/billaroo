@@ -4,10 +4,10 @@ import tableStyles from "../../components/Table/Table.module.css";
 import { useAuth } from "../../context/AuthContext";
 import ProjectModal, { type Project as ProjectModalType } from "../../components/modals/ProjectModal/ProjectModal";
 import InvoiceModal, { type CreateInvoice } from "../../components/modals/InvoiceModal/InvoiceModal";
-import { type SendEmailData } from "../../components/modals/InvoiceModal/SendInvoiceModal";
 import Navbar from "../../components/Navbar/Navbar";
 import Table, { type Column } from "../../components/Table/Table";
 import InvoiceViewModal, {type ViewableEntity } from "../../components/modals/InvoiceModal/InvoiceViewModal";
+import FileViewModal, { type ProjectFile, type UploadFileData } from "../../components/modals/FileModal/FileViewModal";
 import {
   FolderOpen,
   Plus,
@@ -22,8 +22,7 @@ import {
   CheckCircle,
   RefreshCw,
   Filter,
-  Download,
-  X
+  Download
 } from 'lucide-react';
 import axios from "../../api/axios";
 
@@ -128,6 +127,12 @@ export default function Projects() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
 
+  // File management states
+  const [showFilesModal, setShowFilesModal] = useState(false);
+  const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([]);
+  const [selectedProjectForFiles, setSelectedProjectForFiles] = useState<Project | null>(null);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+
   useEffect(() => {
     if (user?.role === "freelancer") {
       fetchProjects();
@@ -199,11 +204,32 @@ export default function Projects() {
     }
   };
 
+  // Fetch files for a specific project
+  const fetchProjectFiles = async (projectId: number) => {
+    try {
+      setLoadingFiles(true);
+      const response = await axios.get<ProjectFile[]>(`/files/project/${projectId}`);
+      setProjectFiles(response.data);
+    } catch (err: any) {
+      console.error("Fetch project files error:", err);
+      setError("Failed to load project files");
+    } finally {
+      setLoadingFiles(false);
+    }
+  };
+
   // Handle viewing invoices for a project
   const handleViewInvoices = async (project: Project) => {
     setSelectedProject(project);
     setShowInvoicesModal(true);
     await fetchProjectInvoices(project.id);
+  };
+
+  // Handle viewing files for a project
+  const handleViewFiles = async (project: Project) => {
+    setSelectedProjectForFiles(project);
+    setShowFilesModal(true);
+    await fetchProjectFiles(project.id);
   };
 
   // Handle creating a new invoice for a project
@@ -212,6 +238,102 @@ export default function Projects() {
     setSelectedProject(project);
     setEditingInvoice(null);
     setShowInvoiceModal(true);
+  };
+
+  // Handle file upload
+  const handleUploadFile = async (uploadData: UploadFileData) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadData.file);
+      formData.append('projectId', uploadData.projectId.toString());
+      formData.append('type', uploadData.type.toString());
+      if (uploadData.description) {
+        formData.append('description', uploadData.description);
+      }
+
+      const response = await axios.post('/files/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      // Add the new file to the current list
+      setProjectFiles(prev => [response.data, ...prev]);
+      
+      // Update the project's file count in the projects list
+      setProjects(prev => 
+        prev.map(p => 
+          p.id === uploadData.projectId 
+            ? { ...p, fileCount: p.fileCount + 1 }
+            : p
+        )
+      );
+    } catch (err: any) {
+      console.error("Upload file error:", err);
+      throw new Error(err.response?.data?.message || "Failed to upload file");
+    }
+  };
+
+  // Handle file download
+  const handleDownloadFile = async (fileId: number) => {
+    try {
+      const response = await axios.get(`/files/${fileId}/download`, {
+        responseType: 'blob',
+      });
+      
+      // Get filename from Content-Disposition header or use a default
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'download';
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error("Download file error:", err);
+      setError("Failed to download file");
+    }
+  };
+
+  // Handle file deletion
+  const handleDeleteFile = async (fileId: number) => {
+    if (!confirm('Are you sure you want to delete this file? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await axios.delete(`/files/${fileId}`);
+      
+      // Remove the file from the current list
+      const deletedFile = projectFiles.find(f => f.id === fileId);
+      setProjectFiles(prev => prev.filter(f => f.id !== fileId));
+      
+      // Update the project's file count in the projects list
+      if (deletedFile) {
+        setProjects(prev => 
+          prev.map(p => 
+            p.id === deletedFile.projectId 
+              ? { ...p, fileCount: Math.max(0, p.fileCount - 1) }
+              : p
+          )
+        );
+      }
+    } catch (err: any) {
+      console.error("Delete file error:", err);
+      setError("Failed to delete file");
+    }
   };
 
   // Handle invoice creation/update
@@ -238,28 +360,6 @@ export default function Projects() {
     } catch (err: any) {
       console.error("Invoice submission error:", err);
       throw err; // Re-throw to let InvoiceModal handle the error display
-    }
-  };
-
-  // Handle sending an invoice
-  const handleSendInvoice = async (invoiceId: number, emailData: SendEmailData) => {
-    try {
-      await axios.post(`/invoices/${invoiceId}/send`, emailData);
-      
-      // Update the invoice status in the local state
-      setProjectInvoices(prev =>
-        prev.map(inv => 
-          inv.id === invoiceId 
-            ? { ...inv, status: 'sent', sentAt: new Date().toISOString() }
-            : inv
-        )
-      );
-      
-      // Refresh projects to update any status changes
-      await fetchProjects();
-    } catch (err: any) {
-      console.error("Send invoice error:", err);
-      throw err; // Re-throw to let SendInvoiceModal handle the error display
     }
   };
 
@@ -533,9 +633,12 @@ export default function Projects() {
             <FileText size={14} />
             View Invoices ({project.invoiceCount})
           </button>
-          <button className={tableStyles.dropdownItem}>
+          <button 
+            className={tableStyles.dropdownItem}
+            onClick={() => handleViewFiles(project)}
+          >
             <FolderOpen size={14} />
-            Manage Files
+            Manage Files ({project.fileCount})
           </button>
           <hr className={tableStyles.dropdownDivider} />
           <button
@@ -775,7 +878,6 @@ export default function Projects() {
             setSelectedProject(null);
           }}
           onSubmit={handleInvoiceSubmit}
-          onSendInvoice={handleSendInvoice}
           projects={projects.filter(p => selectedProject ? p.id === selectedProject.id : true).map(p => ({
             id: p.id,
             title: p.title,
@@ -798,23 +900,37 @@ export default function Projects() {
             amount: editingInvoice.amount
           } : null}
           mode={editingInvoice ? 'edit' : 'add'}
-          showSendOption={!!editingInvoice}
         />
 
         <InvoiceViewModal
-        isOpen={showInvoicesModal}
-        onClose={() => {
-          setShowInvoicesModal(false);
-          setSelectedProject(null);
-          setProjectInvoices([]);
-        }}
-        entity={selectedProject}
-        invoices={projectInvoices}
-        loading={loadingInvoices}
-        onOpenCreateInvoice={handleCreateInvoice}
-        titlePrefix="Invoices for"
-        emptyStateMessage="This project doesn't have any invoices. Create an invoice to start billing your client."
-      />
+          isOpen={showInvoicesModal}
+          onClose={() => {
+            setShowInvoicesModal(false);
+            setSelectedProject(null);
+            setProjectInvoices([]);
+          }}
+          entity={selectedProject}
+          invoices={projectInvoices}
+          loading={loadingInvoices}
+          onOpenCreateInvoice={handleCreateInvoice}
+          titlePrefix="Invoices for"
+          emptyStateMessage="This project doesn't have any invoices. Create an invoice to start billing your client."
+        />
+
+        <FileViewModal
+          isOpen={showFilesModal}
+          onClose={() => {
+            setShowFilesModal(false);
+            setSelectedProjectForFiles(null);
+            setProjectFiles([]);
+          }}
+          project={selectedProjectForFiles}
+          files={projectFiles}
+          loading={loadingFiles}
+          onUploadFile={handleUploadFile}
+          onDownloadFile={handleDownloadFile}
+          onDeleteFile={handleDeleteFile}
+        />
 
         {/* Delete Confirmation Modal */}
         {showDeleteModal && projectToDelete && (
@@ -825,12 +941,6 @@ export default function Projects() {
                   <Trash2 size={24} />
                   Delete Project
                 </h2>
-                <button
-                  className={styles.closeButton}
-                  onClick={() => setShowDeleteModal(false)}
-                >
-                  <X size={20} />
-                </button>
               </header>
 
               <div className={styles.modalContent}>
