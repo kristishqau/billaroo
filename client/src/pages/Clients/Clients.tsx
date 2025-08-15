@@ -390,10 +390,6 @@ export default function Clients() {
             <FileText size={14} />
             View Invoices
           </button>
-          <button className={tableStyles.dropdownItem}>
-            <Mail size={14} />
-            Send Email
-          </button>
           <hr className={tableStyles.dropdownDivider} />
           <button
             className={`${tableStyles.dropdownItem} ${tableStyles.danger}`}
