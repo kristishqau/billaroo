@@ -26,7 +26,6 @@ import {
 import axios from "../../api/axios";
 import { useNavigate } from "react-router-dom";
 import ClientProjectsModal from "../../components/modals/ClientModal/ClientProjectsModal";
-import type { SendEmailData } from "../../components/modals/InvoiceModal/SendInvoiceModal";
 
 export type Client = {
   id: number;
@@ -199,28 +198,6 @@ export default function Clients() {
       setClientStats(response.data);
     } catch (err: any) {
       console.error("Fetch client stats error:", err);
-    }
-  };
-
-  // Handle sending an invoice
-  const handleSendInvoice = async (invoiceId: number, emailData: SendEmailData) => {
-    try {
-      await axios.post(`/invoices/${invoiceId}/send`, emailData);
-      
-      // Update the invoice status in the local state
-      setClientInvoices(prev =>
-        prev.map(inv => 
-          inv.id === invoiceId 
-            ? { ...inv, status: 'sent', sentAt: new Date().toISOString() }
-            : inv
-        )
-      );
-      
-      // Refresh clients to update any status changes
-      await fetchClients();
-    } catch (err: any) {
-      console.error("Send invoice error:", err);
-      throw err; // Re-throw to let SendInvoiceModal handle the error display
     }
   };
 
@@ -479,13 +456,6 @@ export default function Clients() {
             <FileText size={14} />
             View Invoices ({client.invoiceCount})
           </button>
-          <button 
-            className={tableStyles.dropdownItem}
-            onClick={() => handleOpenCreateInvoice(client)}
-          >
-            <Plus size={14} />
-            Create Invoice
-          </button>
           <hr className={tableStyles.dropdownDivider} />
           <button
             className={`${tableStyles.dropdownItem} ${tableStyles.danger}`}
@@ -733,7 +703,6 @@ export default function Clients() {
               setSelectedClient(null); // Clear selected client on close
             }}
             onSubmit={handleInvoiceSubmit}
-            onSendInvoice={handleSendInvoice}
             projects={projectsForInvoiceModal.filter(p => selectedClient ? p.clientName === selectedClient.name : true)} // Filter projects by selected client name
             invoice={editingInvoice ? {
               id: editingInvoice.id,
@@ -751,7 +720,6 @@ export default function Clients() {
               amount: editingInvoice.amount
             } : null}
             mode={editingInvoice ? 'edit' : 'add'}
-            showSendOption={!!editingInvoice}
             initialClientId={selectedClient?.id || undefined}
           />
         )}
