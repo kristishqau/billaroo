@@ -31,6 +31,7 @@ export default function Login() {
   const [error, setError] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
+  const [accountLocked, setAccountLocked] = useState(false)
   
   const { login } = useAuth()
   const navigate = useNavigate()
@@ -94,7 +95,15 @@ export default function Login() {
         
         if (typeof responseData === 'string') {
           errorMessage = responseData
+          
+          // Check if account is locked
+          if (responseData.includes('locked') || responseData.includes('Lock')) {
+            setAccountLocked(true)
+          }
         }
+      } else if (err.response?.status === 429) {
+        errorMessage = "Too many login attempts. Please try again later."
+        setAccountLocked(true)
       } else if (err.response?.status === 500) {
         errorMessage = "Server error. Please try again later."
       } else if (err.response?.data) {
@@ -104,8 +113,6 @@ export default function Login() {
       }
       
       setError(errorMessage)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -227,6 +234,14 @@ export default function Login() {
             </div>
           )}
 
+          {accountLocked && (
+            <div className={styles.warning} role="alert">
+              <span className={styles.warningIcon}>⚠️</span>
+              Your account has been temporarily locked due to multiple failed login attempts. 
+              Please try again later or <Link to="/forgot-password" className={styles.link}>reset your password</Link>.
+            </div>
+          )}
+
           {successMessage && (
             <div className={styles.success} role="alert">
               <span className={styles.successIcon}>✅</span>
@@ -237,10 +252,10 @@ export default function Login() {
           <button 
             type="submit" 
             className={styles.submitButton}
-            disabled={loading || !form.username || !form.password}
+            disabled={loading || !form.username || !form.password || accountLocked}
           >
             {loading && <span className={styles.spinner}></span>}
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? "Signing in..." : accountLocked ? "Account Locked" : "Sign In"}
           </button>
         </form>
 
