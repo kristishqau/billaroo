@@ -309,10 +309,6 @@ export default function Projects() {
 
   // Handle file deletion
   const handleDeleteFile = async (fileId: number) => {
-    if (!confirm('Are you sure you want to delete this file? This action cannot be undone.')) {
-      return;
-    }
-
     try {
       await axios.delete(`/files/${fileId}`);
       

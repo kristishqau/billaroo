@@ -12,7 +12,8 @@ import {
   File as FileIcon,
   Calendar,
   User,
-  Plus
+  Plus,
+  AlertTriangle
 } from 'lucide-react';
 
 // File types enum matching the backend
@@ -80,6 +81,8 @@ const FileViewModal: React.FC<FileViewModalProps> = ({
   });
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<ProjectFile | null>(null);
 
   if (!isOpen || !project) return null;
 
@@ -100,6 +103,14 @@ const FileViewModal: React.FC<FileViewModalProps> = ({
     if (mimeType.startsWith('audio/')) return FileType.Audio;
     if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar')) return FileType.Archive;
     return FileType.Document;
+  };
+
+  const handleDeleteConfirmation = async () => {
+    if (fileToDelete) {
+        await onDeleteFile(fileToDelete.id);
+        setFileToDelete(null);
+        setShowDeleteModal(false);
+    }
   };
 
   const handleUpload = async () => {
@@ -314,9 +325,11 @@ const FileViewModal: React.FC<FileViewModalProps> = ({
                           </button>
                           <button
                             className={`${styles.fileActionButton} ${styles.dangerAction}`}
-                            onClick={() => onDeleteFile(file.id)}
-                            title="Delete file"
-                          >
+                            onClick={() => {
+                                setFileToDelete(file);
+                                setShowDeleteModal(true);
+                            }}
+                            >
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -364,6 +377,44 @@ const FileViewModal: React.FC<FileViewModalProps> = ({
           </button>
         </div>
       </div>
+
+      {showDeleteModal && fileToDelete && (
+        <div className={styles.deleteModalOverlay} onClick={() => setShowDeleteModal(false)}>
+          <div className={styles.deleteModal} onClick={(e) => e.stopPropagation()}>
+            <header className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>
+                <AlertTriangle size={24} />
+                Confirm Deletion
+              </h3>
+            </header>
+
+            <div className={styles.modalContent}>
+              <p className={styles.confirmationText}>
+                Are you sure you want to delete the file <strong>{fileToDelete.originalFileName}</strong>?
+              </p>
+              <p className={styles.warningText}>
+                This action cannot be undone. The file will be permanently removed.
+              </p>
+            </div>
+
+            <div className={styles.modalActions}>
+              <button
+                className={`${styles.actionButton} ${styles.secondaryAction}`}
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className={`${styles.actionButton} ${styles.dangerAction}`}
+                onClick={handleDeleteConfirmation}
+              >
+                <Trash2 size={16} />
+                Delete File
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
