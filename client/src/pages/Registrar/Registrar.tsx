@@ -14,6 +14,7 @@ type RegisterForm = {
   confirmPassword: string
   role: "freelancer" | "client"
   agreeToTerms: boolean
+  phoneNumber?: string
 }
 
 type RegisterResponse = {
@@ -32,7 +33,8 @@ export default function Register() {
     password: "",
     confirmPassword: "",
     role: "freelancer",
-    agreeToTerms: false
+    agreeToTerms: false,
+    phoneNumber: ""
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -40,7 +42,8 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({})
-  
+  const [phoneNumber, setPhoneNumber] = useState("")
+
   // Use the custom availability check hook
   const { availability, loading: checkingAvailability } = useAvailabilityCheck(form.username, form.email)
   
@@ -74,9 +77,13 @@ export default function Register() {
     if (form.confirmPassword && form.password !== form.confirmPassword) {
       errors.confirmPassword = "Passwords do not match"
     }
+
+    if (phoneNumber && !/^\+355\d{8,9}$|^0\d{8,9}$/.test(phoneNumber)) {
+      errors.phoneNumber = "Please enter a valid Albanian phone number (e.g. +355671234567)";
+    }
     
     setValidationErrors(errors)
-  }, [form, availability, passwordValidation])
+  }, [form, phoneNumber, availability, passwordValidation]);
 
   // Handle form input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -121,12 +128,12 @@ export default function Register() {
     }
 
     try {
-      // Prepare data for API (exclude confirmPassword and agreeToTerms)
       const registerData = {
         username: form.username,
         email: form.email,
         password: form.password,
-        role: form.role
+        role: form.role,
+        phoneNumber: phoneNumber || undefined
       }
 
       const response = await axios.post<RegisterResponse>("/Auth/register", registerData)
@@ -180,7 +187,7 @@ export default function Register() {
       setLoading(false)
     }
   }
-
+  
   // Toggle password visibility
   const togglePasswordVisibility = (field: 'password' | 'confirmPassword') => {
     if (field === 'password') {
@@ -283,6 +290,26 @@ export default function Register() {
           </div>
 
           <div className={styles.field}>
+            <label htmlFor="phoneNumber">Phone Number</label>
+            <div className={styles.phoneWrapper}>
+              <input
+                type="tel"
+                id="phoneNumber"
+                name="phoneNumber"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="Enter your phone number"
+                autoComplete="tel"
+                disabled={loading}
+                className={validationErrors.phoneNumber ? styles.inputError : ''}
+              />
+            </div>
+            {validationErrors.phoneNumber && (
+              <span className={styles.fieldError}>{validationErrors.phoneNumber}</span>
+            )}
+          </div>
+
+          <div className={styles.field}>
             <label htmlFor="password">
               Password <span className={styles.required}>*</span>
             </label>
@@ -372,7 +399,7 @@ export default function Register() {
               <span className={styles.fieldError}>{validationErrors.confirmPassword}</span>
             )}
             {form.confirmPassword && form.password === form.confirmPassword && form.password.length > 0 && (
-              <span className={styles.fieldSuccess}>✅ Passwords match</span>
+              <span className={styles.fieldSuccess}> Passwords match</span>
             )}
           </div>
 

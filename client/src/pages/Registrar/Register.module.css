@@ -606,6 +606,17 @@
   margin-top: 8px;
 }
 
+.phoneWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.phoneWrapper input {
+  flex: 1;
+}
+
 /* Mobile Responsive */
 @media (max-width: 640px) {
   .container {
