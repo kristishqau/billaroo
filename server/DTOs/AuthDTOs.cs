@@ -139,16 +139,6 @@ namespace Server.DTOs
         public bool RequiresPasswordChange { get; set; }
     }
 
-    public class LoginHistoryDto
-    {
-        public DateTime LoginTime { get; set; }
-        public string? IpAddress { get; set; }
-        public string? UserAgent { get; set; }
-        public bool IsSuccessful { get; set; }
-        public string? FailureReason { get; set; }
-        public string? Location { get; set; } // Can be added later for geolocation
-    }
-
     public class ResendVerificationDto
     {
         [Required]

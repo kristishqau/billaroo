@@ -1,5 +1,6 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using QuestPDF.Infrastructure;
@@ -59,7 +60,12 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IPdfService, PdfService>();
+builder.Services.AddScoped<ISmsService, SmsService>();
+builder.Services.AddScoped<IFileUploadService, FileUploadService>();
+builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
+builder.Services.AddScoped<ISecurityAuditService, SecurityAuditService>();
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+builder.Services.AddHostedService<SecurityCleanupService>();
 
 // JWT Configuration
 var jwtKey = builder.Configuration.GetSection("AppSettings:Token").Value;
@@ -157,6 +163,17 @@ else
     app.UseHttpsRedirection();
     app.UseCors("AllowReactApp");
 }
+
+if (string.IsNullOrEmpty(app.Environment.WebRootPath))
+{
+    app.Environment.WebRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+}
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(Path.Combine(app.Environment.WebRootPath, "uploads")),
+    RequestPath = "/uploads"
+});
 
 // Add Authentication & Authorization middleware
 app.UseAuthentication();

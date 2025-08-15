@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Server.Data;
@@ -5,7 +6,7 @@ using Server.DTOs;
 using Server.Models;
 using Server.Services;
 using Server.Services.Interfaces;
-using Microsoft.AspNetCore.Authorization;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -19,12 +20,14 @@ namespace Server.Controllers
         private readonly AppDbContext _context;
         private readonly IAuthService _authService;
         private readonly IEmailService _emailService;
+        private readonly ISecurityAuditService _securityAuditService;
 
-        public AuthController(AppDbContext context, IAuthService authService, IEmailService emailService)
+        public AuthController(AppDbContext context, IAuthService authService, IEmailService emailService, ISecurityAuditService securityAuditService)
         {
             _context = context;
             _authService = authService;
             _emailService = emailService;
+            _securityAuditService = securityAuditService;
         }
 
         [HttpPost("register")]
@@ -125,6 +128,10 @@ namespace Server.Controllers
         [HttpPost("login")]
         public async Task<ActionResult<AuthResponseDto>> Login(LoginDto request)
         {
+            string? ipAddress = GetClientIpAddress();
+            string? userAgent = Request.Headers["User-Agent"].ToString();
+            string? deviceInfo = GetDeviceInfo(userAgent);
+
             try
             {
                 // Find user by username
@@ -133,6 +140,9 @@ namespace Server.Controllers
 
                 if (user == null)
                 {
+                    // Log failed login attempt (without revealing if user exists)
+                    await LogLoginAttempt(0, request.Username, false, "Invalid credentials",
+                        ipAddress, userAgent, deviceInfo);
                     return BadRequest("Invalid username or password");
                 }
 
@@ -140,14 +150,17 @@ namespace Server.Controllers
                 if (user.IsAccountLocked && user.LockoutEnd > DateTime.UtcNow)
                 {
                     var remainingTime = user.LockoutEnd.Value.Subtract(DateTime.UtcNow);
+                    await LogLoginAttempt(user.Id, user.Username, false, "Account locked",
+                        ipAddress, userAgent, deviceInfo);
                     return BadRequest($"Account is locked. Try again in {Math.Ceiling(remainingTime.TotalMinutes)} minutes.");
                 }
 
                 // Verify password
                 if (!_authService.VerifyPasswordHash(request.Password, user.PasswordHash, user.PasswordSalt))
                 {
-                    // Increment failed login attempts
                     await HandleFailedLogin(user);
+                    await LogLoginAttempt(user.Id, user.Username, false, "Invalid password",
+                        ipAddress, userAgent, deviceInfo);
                     return BadRequest("Invalid username or password");
                 }
 
@@ -157,6 +170,14 @@ namespace Server.Controllers
                 user.LockoutEnd = null;
                 user.LastLoginAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
+
+                // Log successful login
+                await LogLoginAttempt(user.Id, user.Username, true, null,
+                    ipAddress, userAgent, deviceInfo);
+
+                // Log security audit
+                await _securityAuditService.LogAsync(user.Id, "login_success",
+                    "User logged in successfully", ipAddress, userAgent);
 
                 // Generate JWT token
                 var token = _authService.CreateToken(user);
@@ -169,14 +190,133 @@ namespace Server.Controllers
                     Role = user.Role,
                     Token = token,
                     IsEmailVerified = user.IsEmailVerified,
+                    FirstName = user.FirstName,
+                    LastName = user.LastName,
                     LastLoginAt = user.LastLoginAt
                 });
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Login error: {ex.Message}");
+                await LogLoginAttempt(0, request.Username, false, "System error",
+                    ipAddress, userAgent, deviceInfo);
                 return StatusCode(500, "An error occurred during login");
             }
+        }
+
+        [HttpPost("logout")]
+        [Authorize]
+        public async Task<ActionResult> Logout()
+        {
+            var userId = GetCurrentUserId();
+
+            // Log the logout
+            await _securityAuditService.LogAsync(userId, "logout",
+                "User logged out", HttpContext);
+
+            return Ok(new { message = "Logged out successfully" });
+        }
+
+        [HttpPost("login-with-2fa")]
+        public async Task<ActionResult<AuthResponseDto>> LoginWithTwoFactor(LoginWith2FADto request)
+        {
+            string? ipAddress = GetClientIpAddress();
+            string? userAgent = Request.Headers["User-Agent"].ToString();
+            string? deviceInfo = GetDeviceInfo(userAgent);
+
+            try
+            {
+                var user = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Username == request.Username);
+
+                if (user == null || !user.TwoFactorEnabled)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                // Verify password first
+                if (!_authService.VerifyPasswordHash(request.Password, user.PasswordHash, user.PasswordSalt))
+                {
+                    await LogLoginAttempt(user.Id, user.Username, false, "Invalid password (2FA)",
+                        ipAddress, userAgent, deviceInfo);
+                    return BadRequest("Invalid credentials");
+                }
+
+                // Verify 2FA code
+                else if (!string.IsNullOrEmpty(request.RecoveryCode))
+                {
+                    // Remove used recovery code
+                    user.TwoFactorRecoveryCodes = user.TwoFactorRecoveryCodes?
+                        .Where(code => code != request.RecoveryCode.ToLower())
+                        .ToArray();
+                }
+                await LogLoginAttempt(user.Id, user.Username, false, "Invalid 2FA code",
+                    ipAddress, userAgent, deviceInfo);
+                return BadRequest("Invalid two-factor authentication code");
+                
+                // Update login info
+                user.FailedLoginAttempts = 0;
+                user.IsAccountLocked = false;
+                user.LockoutEnd = null;
+                user.LastLoginAt = DateTime.UtcNow;
+                user.LastTwoFactorUsed = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                // Log successful 2FA login
+                await LogLoginAttempt(user.Id, user.Username, true, null,
+                    ipAddress, userAgent, deviceInfo, true);
+
+                await _securityAuditService.LogAsync(user.Id, "2fa_login_success",
+                    "User logged in with 2FA", ipAddress, userAgent);
+
+                var token = _authService.CreateToken(user);
+
+                return Ok(new AuthResponseDto
+                {
+                    Id = user.Id,
+                    Username = user.Username,
+                    Email = user.Email,
+                    Role = user.Role,
+                    Token = token,
+                    IsEmailVerified = user.IsEmailVerified,
+                    FirstName = user.FirstName,
+                    LastName = user.LastName,
+                    LastLoginAt = user.LastLoginAt
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"2FA Login error: {ex.Message}");
+                return StatusCode(500, "An error occurred during login");
+            }
+        }
+
+        [HttpGet("login-history")]
+        [Authorize]
+        public async Task<ActionResult<List<LoginHistoryDto>>> GetLoginHistory(
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 20)
+        {
+            var userId = GetCurrentUserId();
+            var skip = (page - 1) * pageSize;
+
+            var history = await _context.LoginHistories
+                .Where(lh => lh.UserId == userId)
+                .OrderByDescending(lh => lh.LoginTime)
+                .Skip(skip)
+                .Take(pageSize)
+                .Select(lh => new LoginHistoryDto
+                {
+                    LoginTime = lh.LoginTime,
+                    IpAddress = lh.IpAddress,
+                    DeviceInfo = lh.DeviceInfo,
+                    Location = lh.Location,
+                    IsSuccessful = lh.IsSuccessful,
+                    IsTwoFactorUsed = lh.IsTwoFactorUsed
+                })
+                .ToListAsync();
+
+            return Ok(history);
         }
 
         [HttpPost("forgot-password")]
@@ -634,6 +774,87 @@ namespace Server.Controllers
                 </html>";
 
             await _emailService.SendEmailAsync(user.Email, subject, body);
+        }
+        private async Task LogLoginAttempt(int userId, string username, bool isSuccessful,
+    string? failureReason = null, string? ipAddress = null, string? userAgent = null,
+    string? deviceInfo = null, bool isTwoFactorUsed = false)
+        {
+            try
+            {
+                var loginHistory = new LoginHistory
+                {
+                    UserId = userId,
+                    LoginTime = DateTime.UtcNow,
+                    IpAddress = ipAddress,
+                    UserAgent = userAgent,
+                    DeviceInfo = deviceInfo,
+                    Location = await GetLocationFromIp(ipAddress), // Implement this method
+                    IsSuccessful = isSuccessful,
+                    FailureReason = failureReason,
+                    IsTwoFactorUsed = isTwoFactorUsed
+                };
+
+                _context.LoginHistories.Add(loginHistory);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to log login attempt: {ex.Message}");
+            }
+        }
+
+        private string? GetClientIpAddress()
+        {
+            return HttpContext.Connection.RemoteIpAddress?.ToString() ??
+                   Request.Headers["X-Forwarded-For"].FirstOrDefault() ??
+                   Request.Headers["X-Real-IP"].FirstOrDefault();
+        }
+
+        private static string GetDeviceInfo(string? userAgent)
+        {
+            if (string.IsNullOrEmpty(userAgent))
+                return "Unknown";
+
+            // Basic device detection (you can enhance this with a library like UAParser)
+            if (userAgent.Contains("Mobile"))
+                return "Mobile Device";
+            if (userAgent.Contains("Tablet"))
+                return "Tablet";
+            if (userAgent.Contains("Windows"))
+                return "Windows PC";
+            if (userAgent.Contains("Mac"))
+                return "Mac";
+            if (userAgent.Contains("Linux"))
+                return "Linux PC";
+
+            return "Desktop";
+        }
+
+        private async Task<string?> GetLocationFromIp(string? ipAddress)
+        {
+            // Implement IP-to-location service integration
+            // - MaxMind GeoLite2
+            // - IPinfo.io
+            // - IP-API.com
+
+            if (string.IsNullOrEmpty(ipAddress))
+                return null;
+
+            // For now, return null (implement based on your chosen service)
+            return null;
+        }
+
+        // Additional DTO for 2FA login
+        public class LoginWith2FADto
+        {
+            [Required]
+            public required string Username { get; set; }
+
+            [Required]
+            public required string Password { get; set; }
+
+            public string? TwoFactorCode { get; set; }
+            public string? RecoveryCode { get; set; }
         }
     }
 }
