@@ -3,10 +3,11 @@ import styles from "./Projects.module.css";
 import tableStyles from "../../components/Table/Table.module.css";
 import { useAuth } from "../../context/AuthContext";
 import ProjectModal, { type Project as ProjectModalType } from "../../components/modals/ProjectModal/ProjectModal";
-import InvoiceModal, { type CreateInvoice, type Invoice as InvoiceModalType } from "../../components/modals/InvoiceModal/InvoiceModal";
+import InvoiceModal, { type CreateInvoice } from "../../components/modals/InvoiceModal/InvoiceModal";
 import { type SendEmailData } from "../../components/modals/InvoiceModal/SendInvoiceModal";
 import Navbar from "../../components/Navbar/Navbar";
 import Table, { type Column } from "../../components/Table/Table";
+import InvoiceViewModal, {type ViewableEntity } from "../../components/modals/InvoiceModal/InvoiceViewModal";
 import {
   FolderOpen,
   Plus,
@@ -22,12 +23,11 @@ import {
   RefreshCw,
   Filter,
   Download,
-  X,
-  Send
+  X
 } from 'lucide-react';
 import axios from "../../api/axios";
 
-type Project = {
+export type Project = {
   id: number;
   title: string;
   description: string;
@@ -207,7 +207,8 @@ export default function Projects() {
   };
 
   // Handle creating a new invoice for a project
-  const handleCreateInvoice = (project: Project) => {
+  const handleCreateInvoice = (entity: ViewableEntity) => {
+    const project = entity as Project;
     setSelectedProject(project);
     setEditingInvoice(null);
     setShowInvoiceModal(true);
@@ -336,8 +337,8 @@ export default function Projects() {
     setFilteredProjects(filtered);
   };
 
-  const handleSort = (field: 'title' | 'deadline' | 'client', order: 'asc' | 'desc') => {
-    setSortBy(field);
+  const handleSort = (field: string, order: 'asc' | 'desc') => {
+    setSortBy(field as 'title' | 'deadline' | 'client');
     setSortOrder(order);
   };
 
@@ -396,15 +397,6 @@ export default function Projects() {
       case 'overdue': return tableStyles.overdue;
       case 'completed': return tableStyles.completed;
       default: return tableStyles.active;
-    }
-  };
-
-  const getInvoiceStatusBadgeClass = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'paid': return tableStyles.completed;
-      case 'overdue': return tableStyles.overdue;
-      case 'sent': return tableStyles.active;
-      default: return tableStyles.pending;
     }
   };
 
@@ -540,13 +532,6 @@ export default function Projects() {
           >
             <FileText size={14} />
             View Invoices ({project.invoiceCount})
-          </button>
-          <button 
-            className={tableStyles.dropdownItem}
-            onClick={() => handleCreateInvoice(project)}
-          >
-            <Plus size={14} />
-            Create Invoice
           </button>
           <button className={tableStyles.dropdownItem}>
             <FolderOpen size={14} />
@@ -816,137 +801,21 @@ export default function Projects() {
           showSendOption={!!editingInvoice}
         />
 
-        {/* Project Invoices Modal */}
-        {showInvoicesModal && selectedProject && (
-          <div className={styles.modalOverlay} onClick={() => setShowInvoicesModal(false)}>
-            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-              <header className={styles.modalHeader}>
-                <h2 className={styles.modalTitle}>
-                  <FileText size={24} />
-                  Invoices for {selectedProject.title}
-                </h2>
-              </header>
-
-              <div className={styles.modalContent}>
-                {loadingInvoices ? (
-                  <div className={styles.loadingContainer}>
-                    <div className={styles.spinner}></div>
-                    <p className={styles.loadingText}>Loading invoices...</p>
-                  </div>
-                ) : projectInvoices.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '2rem' }}>
-                    <FileText size={48} style={{ color: '#94a3b8', marginBottom: '1rem' }} />
-                    <h3 style={{ color: '#e2e8f0', marginBottom: '0.5rem' }}>No invoices yet</h3>
-                    <p style={{ color: '#94a3b8', marginBottom: '1.5rem' }}>
-                      This project doesn't have any invoices. Create an invoice to start billing your client.
-                    </p>
-                    <button
-                      className={`${styles.actionButton} ${styles.primaryAction}`}
-                      onClick={() => {
-                        setShowInvoicesModal(false);
-                        handleCreateInvoice(selectedProject);
-                      }}
-                    >
-                      <Plus size={16} />
-                      Create Invoice
-                    </button>
-                  </div>
-                ) : (
-                  <div className={styles.invoicesList}>
-                    {projectInvoices.map((invoice) => (
-                      <div key={invoice.id} className={styles.invoiceCard}>
-                        <div className={styles.invoiceHeader}>
-                          <div className={styles.invoiceInfo}>
-                            <h4 className={styles.invoiceTitle}>
-                              #{invoice.invoiceNumber}
-                            </h4>
-                            <p className={styles.invoiceDescription}>
-                              {invoice.title || 'No title'}
-                            </p>
-                          </div>
-                          <div className={styles.invoiceAmount}>
-                            {formatCurrency(invoice.amount)}
-                          </div>
-                        </div>
-                        
-                        <div className={styles.invoiceDetails}>
-                          <div className={styles.invoiceDate}>
-                            <Calendar size={14} />
-                            <span>Due: {formatDate(invoice.dueDate)}</span>
-                          </div>
-                          <div className={styles.invoiceStatus}>
-                            <span className={`${tableStyles.statusBadge} ${getInvoiceStatusBadgeClass(invoice.status)}`}>
-                              {invoice.status}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className={styles.invoiceActions}>
-                          {(invoice.status === 'draft' || invoice.status === 'pending') && (
-                            <button
-                              className={`${styles.actionButton} ${styles.sendAction}`}
-                              onClick={() => {
-                                setShowInvoicesModal(false);
-                              }}
-                            >
-                              <Send size={14} />
-                              Send
-                            </button>
-                          )}
-                        </div>
-
-                        {invoice.items.length > 0 && (
-                          <div className={styles.invoiceItems}>
-                            <h5>Items:</h5>
-                            <ul>
-                              {invoice.items.map((item) => (
-                                <li key={item.id}>
-                                  {item.description} - {item.quantity} × {formatCurrency(item.rate)} = {formatCurrency(item.total)}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {invoice.payments.length > 0 && (
-                          <div className={styles.invoicePayments}>
-                            <h5>Payments:</h5>
-                            <ul>
-                              {invoice.payments.map((payment) => (
-                                <li key={payment.id}>
-                                  {formatCurrency(payment.amount)} on {formatDate(payment.paymentDate)} ({payment.method})
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className={styles.modalActions}>
-                <button
-                  className={`${styles.actionButton} ${styles.primaryAction}`}
-                  onClick={() => {
-                    setShowInvoicesModal(false);
-                    handleCreateInvoice(selectedProject);
-                  }}
-                >
-                  <Plus size={16} />
-                  Create New Invoice
-                </button>
-                <button
-                  className={`${styles.actionButton} ${styles.secondaryAction}`}
-                  onClick={() => setShowInvoicesModal(false)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <InvoiceViewModal
+        isOpen={showInvoicesModal}
+        onClose={() => {
+          setShowInvoicesModal(false);
+          setSelectedProject(null);
+          setProjectInvoices([]);
+        }}
+        entity={selectedProject}
+        invoices={projectInvoices}
+        loading={loadingInvoices}
+        onOpenCreateInvoice={handleCreateInvoice}
+        onSendInvoice={handleSendInvoice}
+        titlePrefix="Invoices for"
+        emptyStateMessage="This project doesn't have any invoices. Create an invoice to start billing your client."
+      />
 
         {/* Delete Confirmation Modal */}
         {showDeleteModal && projectToDelete && (

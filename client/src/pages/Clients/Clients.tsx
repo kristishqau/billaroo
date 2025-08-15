@@ -4,6 +4,8 @@ import tableStyles from "../../components/Table/Table.module.css";
 import { useAuth } from "../../context/AuthContext";
 import ClientModal, { type Client as ClientModalType } from "../../components/modals/ClientModal/ClientModal";
 import Navbar from "../../components/Navbar/Navbar";
+import InvoiceViewModal, { type ViewableEntity } from "../../components/modals/InvoiceModal/InvoiceViewModal";
+import InvoiceModal, { type CreateInvoice, type Invoice as InvoiceModalType } from "../../components/modals/InvoiceModal/InvoiceModal";
 import Table, { type Column } from "../../components/Table/Table";
 import {
   Users,
@@ -15,24 +17,25 @@ import {
   Building,
   FolderOpen,
   FileText,
-  DollarSign,
   RefreshCw,
   Download,
   BarChart3,
   Edit,
-  Calendar,
-  Clock,
-  CheckCircle,
-  AlertCircle
+  DollarSign
 } from 'lucide-react';
 import axios from "../../api/axios";
 import { useNavigate } from "react-router-dom";
+import ClientProjectsModal from "../../components/modals/ClientModal/ClientProjectsModal";
+import type { SendEmailData } from "../../components/modals/InvoiceModal/SendInvoiceModal";
 
 export type Client = {
   id: number;
   name: string;
   email: string;
   company: string;
+  projectCount: number;
+  invoiceCount: number;
+  totalRevenue: number;
 };
 
 type ClientStats = {
@@ -43,6 +46,14 @@ type ClientStats = {
     clientName: string;
     totalRevenue: number;
   }>;
+};
+
+// Project type for invoice modal
+type ProjectForInvoiceModal = {
+  id: number;
+  title: string;
+  clientName: string;
+  clientEmail?: string;
 };
 
 // Invoice types
@@ -103,11 +114,20 @@ export default function Clients() {
   const [showClientModal, setShowClientModal] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
+  // State for projects modal
+  const [showProjectsModal, setShowProjectsModal] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+
   // Invoice viewing states
   const [showInvoicesModal, setShowInvoicesModal] = useState(false);
   const [clientInvoices, setClientInvoices] = useState<Invoice[]>([]);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
+
+  // Invoice creation states
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceModalType | null>(null);
+  const [projectsForInvoiceModal, setProjectsForInvoiceModal] = useState<ProjectForInvoiceModal[]>([]);
+
 
   useEffect(() => {
     if (user?.role === "freelancer") {
@@ -130,8 +150,38 @@ export default function Clients() {
     try {
       setLoading(true);
       setError("");
-      const response = await axios.get<Client[]>("/clients");
-      setClients(response.data);
+
+      const [clientsRes, projectsRes, invoicesRes] = await Promise.all([
+        axios.get<Client[]>("/clients"),
+        axios.get<any[]>("/projects"),
+        axios.get<any[]>("/invoices"),
+      ]);
+
+      const enrichedClients = clientsRes.data.map(client => {
+        const clientProjects = projectsRes.data.filter(p => p.clientId === client.id);
+        const clientInvoices = invoicesRes.data.filter(inv => inv.clientId === client.id);
+
+        const projectCount = clientProjects.length;
+        const invoiceCount = clientInvoices.length;
+        const totalRevenue = clientInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+
+        return { 
+          ...client,
+          projectCount,
+          invoiceCount,
+          totalRevenue
+        };
+      });
+
+      setClients(enrichedClients);
+      // Fetch all projects to be used in the InvoiceModal
+      setProjectsForInvoiceModal(projectsRes.data.map((project: any) => ({
+        id: project.id,
+        title: project.title,
+        clientName: project.clientName,
+        clientEmail: project.clientEmail
+      })));
+
     } catch (err: any) {
       console.error("Fetch clients error:", err);
       setError("Failed to load clients");
@@ -152,7 +202,29 @@ export default function Clients() {
     }
   };
 
-  // Fetch invoices for a specific client
+  // Handle sending an invoice
+  const handleSendInvoice = async (invoiceId: number, emailData: SendEmailData) => {
+    try {
+      await axios.post(`/invoices/${invoiceId}/send`, emailData);
+      
+      // Update the invoice status in the local state
+      setClientInvoices(prev =>
+        prev.map(inv => 
+          inv.id === invoiceId 
+            ? { ...inv, status: 'sent', sentAt: new Date().toISOString() }
+            : inv
+        )
+      );
+      
+      // Refresh clients to update any status changes
+      await fetchClients();
+    } catch (err: any) {
+      console.error("Send invoice error:", err);
+      throw err; // Re-throw to let SendInvoiceModal handle the error display
+    }
+  };
+
+  // Fetch invoices for a specific client (unchanged)
   const fetchClientInvoices = async (clientId: number) => {
     try {
       setLoadingInvoices(true);
@@ -171,6 +243,12 @@ export default function Clients() {
     setSelectedClient(client);
     setShowInvoicesModal(true);
     await fetchClientInvoices(client.id);
+  };
+
+  // Handler to open the projects modal
+  const handleViewProjects = (client: Client) => {
+    setSelectedClient(client);
+    setShowProjectsModal(true);
   };
 
   const filterAndSortClients = () => {
@@ -215,9 +293,37 @@ export default function Clients() {
     setFilteredClients(filtered);
   };
 
-  const handleSort = (field: 'name' | 'company' | 'email', order: 'asc' | 'desc') => {
-    setSortBy(field);
+  const handleSort = (field: string, order: 'asc' | 'desc') => {
+    setSortBy(field as 'name' | 'company' | 'email');
     setSortOrder(order);
+  };
+
+  // Function to open the create invoice modal for a specific client
+  const handleOpenCreateInvoice = (entity: ViewableEntity) => {
+    const client = entity as Client;
+    setSelectedClient(client);
+    setEditingInvoice(null); // Ensure no existing invoice is being edited
+    setShowInvoiceModal(true);
+  };
+
+  // Handle invoice creation/update
+  const handleInvoiceSubmit = async (invoiceData: CreateInvoice) => {
+    try {
+      if (editingInvoice) {
+        await axios.put(`/invoices/${editingInvoice.id}`, invoiceData);
+      } else {
+        await axios.post("/invoices", invoiceData);
+      }
+      
+      // Refresh clients to update invoice counts and totals
+      await fetchClients();
+      setShowInvoiceModal(false);
+      setEditingInvoice(null);
+      setSelectedClient(null); // Clear selected client after invoice creation
+    } catch (err: any) {
+      console.error("Invoice submission error:", err);
+      throw err; // Re-throw to let InvoiceModal handle the error display
+    }
   };
 
   const handleClientSubmit = async (clientData: Omit<ClientModalType, 'id'>) => {
@@ -274,23 +380,6 @@ export default function Clients() {
     }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  const getInvoiceStatusBadgeClass = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'paid': return styles.completed;
-      case 'overdue': return styles.overdue;
-      case 'sent': return styles.active;
-      default: return styles.pending;
-    }
-  };
-
   // Define columns for the Clients Table
   const clientColumns: Column<Client>[] = [
     {
@@ -342,10 +431,10 @@ export default function Clients() {
       key: 'projects',
       header: 'Projects',
       gridColumnWidth: '120px',
-      render: () => (
+      render: (client) => (
         <div className={tableStyles.cellWithIcon}>
           <FolderOpen size={14} />
-          <span>Loading...</span> {/* Placeholder, would be actual data */}
+          <span>{client.projectCount ?? 0}</span>
         </div>
       )
     },
@@ -353,10 +442,10 @@ export default function Clients() {
       key: 'revenue',
       header: 'Revenue',
       gridColumnWidth: '120px',
-      render: () => (
+      render: (client) => (
         <div className={tableStyles.cellWithIcon}>
           <DollarSign size={14} />
-          <span>Loading...</span> {/* Placeholder, would be actual data */}
+          <span>{formatCurrency(client.totalRevenue ?? 0)}</span>
         </div>
       )
     },
@@ -367,11 +456,11 @@ export default function Clients() {
       render: (client) => (
         <>
           <button
-            onClick={() => navigate('/projects')}
+            onClick={() => handleViewProjects(client)}
             className={tableStyles.dropdownItem}
           >
             <Eye size={14} />
-            View Projects
+            View Projects ({client.projectCount})
           </button>
           <button
             className={tableStyles.dropdownItem}
@@ -388,7 +477,14 @@ export default function Clients() {
             onClick={() => handleViewInvoices(client)}
           >
             <FileText size={14} />
-            View Invoices
+            View Invoices ({client.invoiceCount})
+          </button>
+          <button 
+            className={tableStyles.dropdownItem}
+            onClick={() => handleOpenCreateInvoice(client)}
+          >
+            <Plus size={14} />
+            Create Invoice
           </button>
           <hr className={tableStyles.dropdownDivider} />
           <button
@@ -611,148 +707,54 @@ export default function Clients() {
           mode={editingClient ? 'edit' : 'add'}
         />
 
-        {/* Client Invoices Modal */}
-        {showInvoicesModal && selectedClient && (
-          <div className={styles.modalOverlay} onClick={() => setShowInvoicesModal(false)}>
-            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-              <header className={styles.modalHeader}>
-                <h2 className={styles.modalTitle}>
-                  <FileText size={24} />
-                  Invoices for {selectedClient.name}
-                </h2>
-              </header>
+        {/* Invoice View Modal */}
+        <InvoiceViewModal
+          isOpen={showInvoicesModal}
+          onClose={() => {
+            setShowInvoicesModal(false);
+            setSelectedClient(null);
+            setClientInvoices([]);
+          }}
+          entity={selectedClient}
+          invoices={clientInvoices}
+          loading={loadingInvoices}
+          onOpenCreateInvoice={handleOpenCreateInvoice}
+          onSendInvoice={handleSendInvoice}
+          titlePrefix="Invoices for"
+          emptyStateMessage="This client doesn't have any invoices. Create an invoice to start billing."
+        />
 
-              <div className={styles.modalContent}>
-                {loadingInvoices ? (
-                  <div className={styles.loadingContainer}>
-                    <div className={styles.spinner}></div>
-                    <p className={styles.loadingText}>Loading invoices...</p>
-                  </div>
-                ) : clientInvoices.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '2rem' }}>
-                    <FileText size={48} style={{ color: '#94a3b8', marginBottom: '1rem' }} />
-                    <h3 style={{ color: '#e2e8f0', marginBottom: '0.5rem' }}>No invoices yet</h3>
-                    <p style={{ color: '#94a3b8', marginBottom: '1.5rem' }}>
-                      This client doesn't have any invoices. Create a project and invoice to start billing.
-                    </p>
-                  </div>
-                ) : (
-                  <div className={styles.invoicesList}>
-                    {clientInvoices.map((invoice) => (
-                      <div key={invoice.id} className={styles.invoiceCard}>
-                        <div className={styles.invoiceHeader}>
-                          <div className={styles.invoiceInfo}>
-                            <h4 className={styles.invoiceTitle}>
-                              #{invoice.invoiceNumber}
-                            </h4>
-                            <p className={styles.invoiceDescription}>
-                              {invoice.title || 'No title'}
-                            </p>
-                            <p className={styles.invoiceProject}>
-                              Project: {invoice.projectTitle}
-                            </p>
-                          </div>
-                          <div className={styles.invoiceAmount}>
-                            {formatCurrency(invoice.amount)}
-                          </div>
-                        </div>
-                        
-                        <div className={styles.invoiceDetails}>
-                          <div className={styles.invoiceDate}>
-                            <Calendar size={14} />
-                            <span>Issue: {formatDate(invoice.issueDate)}</span>
-                          </div>
-                          <div className={styles.invoiceDate}>
-                            <Clock size={14} />
-                            <span>Due: {formatDate(invoice.dueDate)}</span>
-                          </div>
-                          <div className={styles.invoiceStatus}>
-                            <span className={`${tableStyles.statusBadge} ${getInvoiceStatusBadgeClass(invoice.status)}`}>
-                              {invoice.status === 'Paid' && <CheckCircle size={12} />}
-                              {invoice.status === 'Overdue' && <AlertCircle size={12} />}
-                              {invoice.status === 'Sent' && <Clock size={12} />}
-                              {invoice.status === 'Draft' && <FileText size={12} />}
-                              {invoice.status}
-                            </span>
-                          </div>
-                        </div>
-
-                        {invoice.description && (
-                          <div className={styles.invoiceDescription}>
-                            <p>{invoice.description}</p>
-                          </div>
-                        )}
-
-                        {invoice.items.length > 0 && (
-                          <div className={styles.invoiceItems}>
-                            <h5>Items:</h5>
-                            <ul>
-                              {invoice.items.slice(0, 3).map((item) => (
-                                <li key={item.id}>
-                                  {item.description} - {item.quantity} × {formatCurrency(item.rate)} = {formatCurrency(item.total)}
-                                </li>
-                              ))}
-                              {invoice.items.length > 3 && (
-                                <li style={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                                  ... and {invoice.items.length - 3} more items
-                                </li>
-                              )}
-                            </ul>
-                          </div>
-                        )}
-
-                        {invoice.payments.length > 0 && (
-                          <div className={styles.invoicePayments}>
-                            <h5>Recent Payments:</h5>
-                            <ul>
-                              {invoice.payments.slice(0, 2).map((payment) => (
-                                <li key={payment.id}>
-                                  {formatCurrency(payment.amount)} on {formatDate(payment.paymentDate)} ({payment.method})
-                                </li>
-                              ))}
-                              {invoice.payments.length > 2 && (
-                                <li style={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                                  ... and {invoice.payments.length - 2} more payments
-                                </li>
-                              )}
-                            </ul>
-                          </div>
-                        )}
-
-                        {(invoice.sentAt || invoice.paidAt) && (
-                          <div className={styles.invoiceDates}>
-                            {invoice.sentAt && (
-                              <div className={styles.invoiceDate}>
-                                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                                  Sent: {formatDate(invoice.sentAt)}
-                                </span>
-                              </div>
-                            )}
-                            {invoice.paidAt && (
-                              <div className={styles.invoiceDate}>
-                                <span style={{ fontSize: '0.8rem', color: '#22c55e' }}>
-                                  Paid: {formatDate(invoice.paidAt)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className={styles.modalActions}>
-                <button
-                  className={`${styles.actionButton} ${styles.secondaryAction}`}
-                  onClick={() => setShowInvoicesModal(false)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
+        {/* Invoice Creation Modal */}
+        {showInvoiceModal && (
+          <InvoiceModal
+            isOpen={showInvoiceModal}
+            onClose={() => {
+              setShowInvoiceModal(false);
+              setEditingInvoice(null);
+              setSelectedClient(null); // Clear selected client on close
+            }}
+            onSubmit={handleInvoiceSubmit}
+            onSendInvoice={handleSendInvoice}
+            projects={projectsForInvoiceModal.filter(p => selectedClient ? p.clientName === selectedClient.name : true)} // Filter projects by selected client name
+            invoice={editingInvoice ? {
+              id: editingInvoice.id,
+              title: editingInvoice.title,
+              description: editingInvoice.description || '',
+              projectId: editingInvoice.projectId,
+              dueDate: editingInvoice.dueDate,
+              items: editingInvoice.items.map(item => ({
+                id: item.id,
+                description: item.description,
+                quantity: item.quantity,
+                rate: item.rate,
+                total: item.total
+              })),
+              amount: editingInvoice.amount
+            } : null}
+            mode={editingInvoice ? 'edit' : 'add'}
+            showSendOption={!!editingInvoice}
+            initialClientId={selectedClient?.id || undefined}
+          />
         )}
 
         {/* Delete Confirmation Modal */}
@@ -801,6 +803,21 @@ export default function Clients() {
           </div>
         )}
       </div>
+
+      {/* Projects Modal */}
+      {showProjectsModal && selectedClient && (
+        <ClientProjectsModal
+          isOpen={showProjectsModal}
+          onClose={() => {
+            setShowProjectsModal(false);
+            setSelectedClient(null);
+          }}
+          client={selectedClient}
+          onViewProject={(projectId) => {
+            navigate(`/projects/${projectId}`);
+          }}
+        />
+      )}
     </div>
   );
 }

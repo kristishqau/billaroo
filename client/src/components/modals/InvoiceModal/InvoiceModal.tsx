@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import styles from "./InvoiceModal.module.css";
 import { FileText, Plus, X, Trash2, Calculator } from 'lucide-react';
+import type { SendEmailData } from "./SendInvoiceModal";
 
 // Separate types for create/update vs display
 export type CreateInvoiceItem = {
@@ -44,10 +45,13 @@ export type Project = {
 interface InvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (invoice: CreateInvoice) => Promise<void>; // Use CreateInvoice type
+  onSubmit: (invoice: CreateInvoice) => Promise<void>;
   projects: Project[];
   invoice?: Invoice | null;
   mode?: 'add' | 'edit';
+  onSendInvoice: (invoiceId: number, emailData: SendEmailData) => Promise<void>;
+  showSendOption: boolean;
+  initialClientId?: number;
 }
 
 // Internal type for form state (includes total for UI calculations)
