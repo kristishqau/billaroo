@@ -812,7 +812,6 @@ export default function Projects() {
         invoices={projectInvoices}
         loading={loadingInvoices}
         onOpenCreateInvoice={handleCreateInvoice}
-        onSendInvoice={handleSendInvoice}
         titlePrefix="Invoices for"
         emptyStateMessage="This project doesn't have any invoices. Create an invoice to start billing your client."
       />

@@ -1096,6 +1096,7 @@ export default function Invoices() {
         invoice={editingInvoice}
         mode={editingInvoice ? 'edit' : 'add'}
       />
+      
       {showSendModal && invoiceToSend && (
         <div className={styles.modalOverlay} onClick={!isSending ? () => setShowSendModal(false) : undefined}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>

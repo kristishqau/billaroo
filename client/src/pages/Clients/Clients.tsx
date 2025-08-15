@@ -719,7 +719,6 @@ export default function Clients() {
           invoices={clientInvoices}
           loading={loadingInvoices}
           onOpenCreateInvoice={handleOpenCreateInvoice}
-          onSendInvoice={handleSendInvoice}
           titlePrefix="Invoices for"
           emptyStateMessage="This client doesn't have any invoices. Create an invoice to start billing."
         />

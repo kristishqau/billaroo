@@ -6,10 +6,8 @@ import tableStyles from '../../Table/Table.module.css';
 import {
   FileText,
   Plus,
-  Calendar,
-  Send
+  Calendar
 } from 'lucide-react';
-import type { SendEmailData } from './SendInvoiceModal';
 
 // Common types for invoices, items, and payments
 type InvoiceItem = {
@@ -62,7 +60,6 @@ interface InvoiceViewModalProps {
   invoices: Invoice[];
   loading: boolean;
   onOpenCreateInvoice: (entity: ViewableEntity) => void;
-  onSendInvoice: (invoiceId: number, emailData: SendEmailData) => Promise<void>;
   titlePrefix: string;
   emptyStateMessage: string;
 }
@@ -96,7 +93,6 @@ const InvoiceViewModal: React.FC<InvoiceViewModalProps> = ({
   invoices,
   loading,
   onOpenCreateInvoice,
-  onSendInvoice,
   titlePrefix,
   emptyStateMessage
 }) => {
@@ -156,21 +152,6 @@ const InvoiceViewModal: React.FC<InvoiceViewModalProps> = ({
                         {invoice.status}
                       </span>
                     </div>
-                  </div>
-
-                  <div className={styles.invoiceActions}>
-                    {(invoice.status === 'draft' || invoice.status === 'pending') && (
-                      <button
-                        className={`${styles.actionButton}`}
-                        onClick={() => {
-                          onClose();
-                          onSendInvoice(invoice.id);
-                        }}
-                      >
-                        <Send size={14} />
-                        Send
-                      </button>
-                    )}
                   </div>
 
                   {invoice.items.length > 0 && (
