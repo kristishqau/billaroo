@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Server.Data;
@@ -45,8 +45,9 @@ namespace Server.Controllers
                     return BadRequest("Project not found or not yours.");
 
                 // Generate invoice number
-                var invoiceCount = await _context.Invoices.CountAsync(i => i.FreelancerId == userId);
-                var invoiceNumber = $"INV-{DateTime.Now:yyyyMM}-{(invoiceCount + 1).ToString("D3")}";
+                var currentMonth = DateTime.Now.ToString("yyyyMM");
+                var shortGuid = Guid.NewGuid().ToString("N")[..8].ToUpper();
+                var invoiceNumber = $"INV-{currentMonth}-{shortGuid}";
 
                 // Calculate total amount from items
                 var totalAmount = dto.Items.Sum(item => item.Quantity * item.Rate);
@@ -77,7 +78,6 @@ namespace Server.Controllers
                         Description = itemDto.Description,
                         Quantity = itemDto.Quantity,
                         Rate = itemDto.Rate,
-                        // Removed Total assignment - assuming it's calculated property
                         InvoiceId = invoice.Id
                     };
                     _context.InvoiceItems.Add(item);
