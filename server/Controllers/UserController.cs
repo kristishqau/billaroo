@@ -356,44 +356,40 @@ namespace Server.Controllers
         #region File Uploads
 
         [HttpPost("upload-profile-image")]
-        public async Task<ActionResult> UploadProfileImage([FromForm] UploadImageDto request)
+        public async Task<ActionResult> UploadProfileImage(IFormFile file)
         {
             var userId = GetUserId();
             var user = await _context.Users.FindAsync(userId);
-            var file = request.File;
 
             if (user == null)
                 return NotFound("User not found.");
 
             if (file == null || file.Length == 0)
-                return BadRequest("No file provided.");
-
-            var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif" };
-            if (!allowedTypes.Contains(file.ContentType))
-                return BadRequest("Only JPEG, PNG, and GIF images are allowed.");
-
-            if (file.Length > 5 * 1024 * 1024) // 5MB limit
-                return BadRequest("File size cannot exceed 5MB.");
+                return BadRequest("No file was provided.");
 
             try
             {
-                var imageUrl = await _fileUploadService.UploadImageAsync(file, "profile-images");
-
-                user.ProfileImageUrl = imageUrl;
+                // Upload the file using the injected service
+                var fileUrl = await _fileUploadService.UploadFileAsync(file, $"profile-images/{userId}");
+                user.ProfileImageUrl = fileUrl;
                 user.UpdatedAt = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();
+                await _securityAuditService.LogAsync(userId, "profile_image_uploaded",
+                    "User profile image uploaded", HttpContext);
 
-                return Ok(new { profileImageUrl = imageUrl, message = "Profile image updated successfully." });
+                return Ok(new { message = "Profile image uploaded successfully.", fileUrl = fileUrl });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Failed to upload image.");
+                await _securityAuditService.LogAsync(userId, "profile_image_upload_failed",
+                    $"Profile image upload failed: {ex.Message}", HttpContext);
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
         [HttpPost("upload-cv")]
-        public async Task<ActionResult> UploadCv([FromForm] UploadCvDto dto)
+        public async Task<ActionResult> UploadCv(IFormFile cvFile)
         {
             var userId = GetUserId();
             var user = await _context.Users.FindAsync(userId);
@@ -401,31 +397,28 @@ namespace Server.Controllers
             if (user == null)
                 return NotFound("User not found.");
 
-            var allowedTypes = new[] { "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
-            if (!allowedTypes.Contains(dto.CvFile.ContentType))
-                return BadRequest("Only PDF and Word documents are allowed.");
-
-            if (dto.CvFile.Length > 10 * 1024 * 1024) // 10MB limit
-                return BadRequest("File size cannot exceed 10MB.");
+            if (cvFile == null || cvFile.Length == 0)
+                return BadRequest("No file was provided.");
 
             try
             {
-                var cvUrl = await _fileUploadService.UploadFileAsync(dto.CvFile, "cv-documents");
-
-                user.CvUrl = cvUrl;
+                var fileUrl = await _fileUploadService.UploadFileAsync(cvFile, $"user-cvs/{userId}");
+                user.CvUrl = fileUrl;
                 user.CvUploadedAt = DateTime.UtcNow;
                 user.UpdatedAt = DateTime.UtcNow;
                 user.IsProfileComplete = CheckProfileCompletion(user);
 
                 await _context.SaveChangesAsync();
+                await _securityAuditService.LogAsync(userId, "cv_uploaded",
+                    "User CV uploaded", HttpContext);
 
-                await _securityAuditService.LogAsync(userId, "cv_uploaded", "CV/Resume uploaded", HttpContext);
-
-                return Ok(new { cvUrl = cvUrl, message = "CV uploaded successfully." });
+                return Ok(new { message = "CV uploaded successfully.", fileUrl = fileUrl });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Failed to upload CV.");
+                await _securityAuditService.LogAsync(userId, "cv_upload_failed",
+                    $"CV upload failed: {ex.Message}", HttpContext);
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
