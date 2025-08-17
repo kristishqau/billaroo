@@ -14,6 +14,7 @@ using System.Text.RegularExpressions;
 namespace Server.Services
 {
     // SMS Service Implementation
+    // SMS Service Implementation
     public class SmsService : ISmsService
     {
         private readonly IConfiguration _configuration;
@@ -35,20 +36,52 @@ namespace Server.Services
                     return false;
                 }
 
-                // TODO: Integrate with your SMS provider (Twilio, AWS SNS, etc.)
-                // For now, we'll log the message (remove in production)
-                _logger.LogInformation("SMS to {PhoneNumber}: {Message}", phoneNumber, message);
+                // FOR DEVELOPMENT: Use a mock SMS service that always succeeds
+                var isDevelopment = _configuration.GetValue<bool>("IsDevelopment", true);
 
-                // Simulate API call delay
-                await Task.Delay(1000);
+                if (isDevelopment)
+                {
+                    // Store the verification code in a development cache/file for testing
+                    await StoreVerificationCodeForDevelopment(phoneNumber, ExtractCodeFromMessage(message));
+                    _logger.LogInformation("DEVELOPMENT SMS - Phone: {PhoneNumber}, Message: {Message}", phoneNumber, message);
+                    return true;
+                }
+                else
+                {
+                    // TODO: Add your production SMS provider here (Twilio, AWS SNS, etc.)
+                    // Example for Twilio:
+                    // return await SendViaTwilio(phoneNumber, message);
 
-                return true;
+                    _logger.LogWarning("Production SMS service not configured");
+                    return false;
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to send SMS to {PhoneNumber}", phoneNumber);
                 return false;
             }
+        }
+
+        // DEVELOPMENT HELPER: Store codes for testing
+        private async Task StoreVerificationCodeForDevelopment(string phoneNumber, string code)
+        {
+            try
+            {
+                var tempPath = Path.Combine(Path.GetTempPath(), "billaroo_dev_codes.txt");
+                var entry = $"{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} | {phoneNumber} | {code}{Environment.NewLine}";
+                await File.AppendAllTextAsync(tempPath, entry);
+                _logger.LogInformation("Verification code stored in: {TempPath}", tempPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to store development verification code");
+            }
+        }
+        private string ExtractCodeFromMessage(string message)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(message, @"\b\d{6}\b");
+            return match.Success ? match.Value : "";
         }
 
         public async Task<bool> SendVerificationCodeAsync(string phoneNumber, string code)

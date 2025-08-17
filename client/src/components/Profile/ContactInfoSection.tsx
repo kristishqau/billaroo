@@ -9,10 +9,8 @@ interface PhoneVerificationState {
   code: string;
   setCode: (code: string) => void;
   isSent: boolean;
-  error: string | null;
-  success: string | null;
   handleSendVerification: (phoneNumber: string) => void;
-  handleVerifyPhone: () => void;
+  handleVerifyPhone: (onSuccessCallback: () => void) => Promise<void>;
 }
 
 interface ContactInfoSectionProps {
@@ -45,17 +43,6 @@ const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
       <h2 className={styles.sectionTitle}>
         <Mail size={20} /> Contact Information
       </h2>
-      
-      {phoneVerification.success && (
-        <div className={styles.messageSuccess}>
-          <CheckCircle size={18} /> {phoneVerification.success}
-        </div>
-      )}
-      {phoneVerification.error && (
-        <div className={styles.messageError}>
-          <XCircle size={18} /> {phoneVerification.error}
-        </div>
-      )}
       
       {!isEditing ? (
         <div>
@@ -121,7 +108,7 @@ const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
                   />
                   <button
                     type="button"
-                    onClick={phoneVerification.handleVerifyPhone}
+                    onClick={() => phoneVerification.handleVerifyPhone(() => {})}
                     className={styles.formButton}
                     style={{ fontSize: '0.875rem', padding: 'var(--spacing-sm) var(--spacing-md)' }}
                   >
@@ -153,7 +140,7 @@ const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
               />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-lg)' }}>
+          <div style={{ display: 'flex', gap: 'var(--spacing-md)'}}>
             <button type="submit" className={styles.formButton}>
               Save Changes
             </button>

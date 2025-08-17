@@ -9,30 +9,30 @@ export const usePasswordChange = () => {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
-  
+
   const notification = useNotification();
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     notification.clearNotification();
-    
+
     if (newPassword !== confirmNewPassword) {
       notification.showError('New password and confirmation do not match.');
       return;
     }
-    
+
     if (newPassword.length < 6) {
       notification.showError('New password must be at least 6 characters long.');
       return;
     }
-    
+
     try {
       await axios.put('/user/change-password', {
         currentPassword,
         newPassword,
         confirmPassword: confirmNewPassword
       });
-      
+
       notification.showSuccess('Password changed successfully!');
       setCurrentPassword('');
       setNewPassword('');
@@ -66,14 +66,14 @@ export const useTwoFactorAuth = () => {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  
+
   const notification = useNotification();
 
   const handleEnable2FA = async () => {
     setShowModal(true);
     setIsEnabling(true);
     setError(null);
-    
+
     try {
       const response = await axios.post('/auth/enable-2fa');
       setQrCode(response.data.qrCode);
@@ -86,7 +86,7 @@ export const useTwoFactorAuth = () => {
 
   const handleConfirm2FA = async () => {
     setError(null);
-    
+
     try {
       await axios.post('/auth/verify-2fa-setup', { code });
       notification.showSuccess('Two-factor authentication enabled successfully!');
@@ -102,7 +102,7 @@ export const useTwoFactorAuth = () => {
     if (!confirm('Are you sure you want to disable two-factor authentication?')) {
       return;
     }
-    
+
     try {
       await axios.post('/auth/disable-2fa');
       notification.showSuccess('Two-factor authentication disabled.');
@@ -128,19 +128,17 @@ export const useTwoFactorAuth = () => {
 
 export const useEmailVerification = () => {
   const [isResending, setIsResending] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const notification = useNotification();
 
   const handleResendVerification = async () => {
     setIsResending(true);
-    setMessage(null);
-    setError(null);
-    
+    notification.clearNotification();
+
     try {
       await axios.post('/auth/resend-verification');
-      setMessage('Verification email sent successfully! Please check your inbox.');
+      notification.showSuccess('Verification email sent successfully! Please check your inbox.');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to send verification email.');
+      notification.showError(err.response?.data?.message || 'Failed to send verification email.');
     } finally {
       setIsResending(false);
     }
@@ -148,42 +146,40 @@ export const useEmailVerification = () => {
 
   return {
     isResending,
-    message,
-    error,
-    handleResendVerification
+    handleResendVerification,
+    notification
   };
 };
 
 export const usePhoneVerification = () => {
   const [code, setCode] = useState('');
   const [isSent, setIsSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const notification = useNotification();
 
   const handleSendVerification = async (phoneNumber: string) => {
-    setError(null);
-    setSuccess(null);
-    
+    notification.clearNotification();
+
     try {
       await axios.post('/user/send-phone-verification', { phoneNumber });
       setIsSent(true);
-      setSuccess('Verification code sent to your phone!');
+      notification.showSuccess('Verification code sent to your phone!');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to send verification code.');
+      notification.showError(err.response?.data?.message || 'Failed to send verification code.');
     }
   };
 
-  const handleVerifyPhone = async () => {
-    setError(null);
-    setSuccess(null);
-    
+  const handleVerifyPhone = async (onSuccessCallback: () => void) => {
+    notification.clearNotification();
+
     try {
       await axios.post('/user/verify-phone', { verificationCode: code });
-      setSuccess('Phone number verified successfully!');
+      notification.showSuccess('Phone number verified successfully!');
       setIsSent(false);
       setCode('');
+      onSuccessCallback();
+
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to verify phone number.');
+      notification.showError(err.response?.data?.message || 'Failed to verify phone number.');
     }
   };
 
@@ -191,9 +187,8 @@ export const usePhoneVerification = () => {
     code,
     setCode,
     isSent,
-    error,
-    success,
     handleSendVerification,
-    handleVerifyPhone
+    handleVerifyPhone,
+    notification
   };
 };

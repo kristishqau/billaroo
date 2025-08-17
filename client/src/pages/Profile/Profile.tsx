@@ -234,8 +234,6 @@ export default function Profile() {
                   code: phoneVerification.code,
                   setCode: phoneVerification.setCode,
                   isSent: phoneVerification.isSent,
-                  error: phoneVerification.error,
-                  success: phoneVerification.success,
                   handleSendVerification: phoneVerification.handleSendVerification,
                   handleVerifyPhone: phoneVerification.handleVerifyPhone
                 }}
@@ -287,8 +285,6 @@ export default function Profile() {
                 formatDate={formatDate}
                 emailVerification={{
                   isResending: emailVerification.isResending,
-                  message: emailVerification.message,
-                  error: emailVerification.error,
                   handleResendVerification: emailVerification.handleResendVerification
                 }}
                 onEnable2FA={twoFactorAuth.handleEnable2FA}

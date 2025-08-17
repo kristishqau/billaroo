@@ -11,8 +11,6 @@ interface AccountStatusSectionProps {
   formatDate: (date: string | null) => string;
   emailVerification: {
     isResending: boolean;
-    message: string | null;
-    error: string | null;
     handleResendVerification: () => void;
   };
   onEnable2FA: () => void;
@@ -40,17 +38,6 @@ const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
       <h2 className={styles.sectionTitle}>
         <Shield size={20} /> Account Status & Verification
       </h2>
-      
-      {emailVerification.message && (
-        <div className={styles.messageSuccess}>
-          <CheckCircle size={18} /> {emailVerification.message}
-        </div>
-      )}
-      {emailVerification.error && (
-        <div className={styles.messageError}>
-          <XCircle size={18} /> {emailVerification.error}
-        </div>
-      )}
 
       {/* Verification Status Cards */}
       <div style={{ display: 'grid', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
@@ -74,7 +61,7 @@ const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
           {!securitySettings.isEmailVerified && (
             <button 
               onClick={emailVerification.handleResendVerification} 
-              className={styles.miniButton}
+              className={styles.formButton}
               disabled={emailVerification.isResending}
             >
               <Mail size={14} />
@@ -119,6 +106,7 @@ const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
             className={styles.formButton}
             onClick={securitySettings.twoFactorEnabled ? onDisable2FA : onEnable2FA}
           >
+            <Shield size={14} />
             {securitySettings.twoFactorEnabled ? 'Disable' : 'Enable'}
           </button>
         </div>
