@@ -689,7 +689,7 @@ namespace Server.Controllers
 
             var hasActiveProjects = await _context.Projects
                 .Include(p => p.Client)
-                .AnyAsync(p => p.Client!.FreelancerId == userId && p.Deadline > DateTime.UtcNow);
+                .AnyAsync(p => p.Client!.FreelancerId == userId && p.Deadline > DateTimeOffset.UtcNow);
 
             // Get profile completion and security status
             var user = await _context.Users
@@ -722,6 +722,9 @@ namespace Server.Controllers
                 IsIdentityVerified = user.IsIdentityVerified
             };
 
+            var nowUtc = DateTime.UtcNow;
+            var firstDayOfMonth = new DateTimeOffset(nowUtc.Year, nowUtc.Month, 1, 0, 0, 0, TimeSpan.Zero);
+
             return Ok(new AccountSummaryDto
             {
                 ClientCount = clientCount,
@@ -736,11 +739,9 @@ namespace Server.Controllers
                 TotalClients = clientCount,
                 ActiveProjects = await _context.Projects
                     .Include(p => p.Client)
-                    .CountAsync(p => p.Client!.FreelancerId == userId && p.Deadline > DateTime.UtcNow),
+                    .CountAsync(p => p.Client!.FreelancerId == userId && p.Deadline > DateTimeOffset.UtcNow),
                 ThisMonthRevenue = await _context.Invoices
-                    .Where(i => i.FreelancerId == userId &&
-                               i.Status == InvoiceStatus.Paid &&
-                               i.IssueDate >= new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1))
+                    .Where(i => i.FreelancerId == userId && i.PaidAt.HasValue && i.PaidAt.Value >= firstDayOfMonth)
                     .SumAsync(i => (decimal?)i.Amount) ?? 0,
                 ProfileCompletion = profileCompletion,
                 SecurityStatus = securityStatus,
@@ -856,7 +857,7 @@ namespace Server.Controllers
                 // Warn about active projects
                 var activeProjects = await _context.Projects
                     .Include(p => p.Client)
-                    .Where(p => p.Client!.FreelancerId == userId && p.Deadline > DateTime.UtcNow)
+                    .Where(p => p.Client!.FreelancerId == userId && p.Deadline > DateTimeOffset.UtcNow)
                     .Select(p => new
                     {
                         Title = p.Title,
