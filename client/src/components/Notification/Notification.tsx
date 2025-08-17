@@ -1,36 +1,44 @@
 import React from 'react';
-import { CheckCircle, XCircle } from 'lucide-react';
-import styles from '../../pages/Profile/Profile.module.css';
+import { CheckCircle, XCircle, X } from 'lucide-react';
+import styles from './Notification.module.css';
+import type { NotificationState } from '../../hooks/useNotification';
 
 interface NotificationProps {
-  type: 'success' | 'error';
-  message: string;
+  notification: NotificationState | null;
   onClose: () => void;
+  className?: string;
 }
 
-const Notification: React.FC<NotificationProps> = ({ type, message, onClose }) => {
-  if (!message) return null;
+const Notification: React.FC<NotificationProps> = ({ notification, onClose, className }) => {
+  if (!notification) return null;
+
+  const handleClose = () => {
+    onClose();
+  };
 
   return (
-    <div className={type === 'success' ? styles.messageSuccess : styles.messageError}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-        {type === 'success' ? <CheckCircle size={18} /> : <XCircle size={18} />}
-        <span>{message}</span>
-        <button 
-          onClick={onClose}
-          style={{ 
-            marginLeft: 'auto', 
-            background: 'none', 
-            border: 'none', 
-            color: type === 'success' ? 'var(--success)' : 'var(--danger)', 
-            cursor: 'pointer',
-            fontSize: '1.2rem',
-            fontWeight: 'bold'
-          }}
-        >
-          ×
-        </button>
+    <div 
+      className={`
+        ${styles.notification} 
+        ${notification.type === 'success' ? styles.notificationSuccess : styles.notificationError} 
+        ${className || ''}
+      `}
+    >
+      <div className={styles.notificationContent}>
+        <div className={styles.notificationIcon}>
+          {notification.type === 'success' ? <CheckCircle size={18} /> : <XCircle size={18} />}
+        </div>
+        <div className={styles.notificationMessage}>
+          {notification.message}
+        </div>
       </div>
+      <button 
+        onClick={handleClose}
+        className={styles.closeButton}
+        aria-label="Close notification"
+      >
+        <X />
+      </button>
     </div>
   );
 };
