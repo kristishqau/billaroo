@@ -4,20 +4,20 @@ WORKDIR /app
 
 # Copy solution and backend project file
 COPY ClientPortal.sln ./
-COPY server/Server.csproj ./Server/
+COPY server/Server.csproj ./server/
 
 # Restore dependencies
 RUN dotnet restore ClientPortal.sln
 
 # Copy backend source code
-COPY Server/. ./Server/
+COPY server/. ./server/
 
 # Build backend
 RUN dotnet build ClientPortal.sln --no-restore -c Release -o /app/build
 
 # Publish stage
 FROM build AS publish
-RUN dotnet publish Server/Server.csproj --no-build -c Release -o /app/publish
+RUN dotnet publish server/Server.csproj --no-build -c Release -o /app/publish
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
