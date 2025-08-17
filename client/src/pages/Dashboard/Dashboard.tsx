@@ -536,7 +536,7 @@ export default function Dashboard() {
                 <div className={styles.tabSection}>
                   <div className={styles.tabSectionHeader}>
                     <h2 className={styles.tabSectionTitle}>Recent Clients</h2>
-                    <button className={styles.viewAllButton}>
+                    <button onClick={() => navigate('/clients')} className={styles.viewAllButton}>
                       View All Clients →
                     </button>
                   </div>
