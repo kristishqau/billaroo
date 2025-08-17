@@ -1,24 +1,29 @@
 # Build stage
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
-WORKDIR /src
+WORKDIR /app
 
-# Copy solution file and project file
-COPY . .
+# Copy solution and backend project file
+COPY ClientPortal.sln ./
+COPY Server/Server.csproj ./Server/
+
+# Restore dependencies
 RUN dotnet restore ClientPortal.sln
 
-# Copy everything else and build
-COPY . .
+# Copy backend source code
+COPY Server/. ./Server/
+
+# Build backend
 RUN dotnet build ClientPortal.sln --no-restore -c Release -o /app/build
 
 # Publish stage
 FROM build AS publish
-RUN dotnet publish Server/Server.csproj.user --no-build -c Release -o /app/publish
+RUN dotnet publish Server/Server.csproj --no-build -c Release -o /app/publish
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 
-# Install system dependencies for QuestPDF and System.Drawing
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     libgdiplus \
     libc6-dev \
@@ -28,7 +33,7 @@ RUN apt-get update && apt-get install -y \
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 # Copy published app
-COPY --from=publish /app/publish .
+COPY --from=publish /app/publish ./
 
 # Create directories and set permissions
 RUN mkdir -p /app/wwwroot/uploads && \
@@ -40,7 +45,7 @@ USER appuser
 # Expose port
 EXPOSE 8080
 
-# Set environment variables
+# Environment
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
