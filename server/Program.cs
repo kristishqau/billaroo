@@ -352,6 +352,9 @@ if (isProduction)
     }
 }
 
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+app.Urls.Add($"http://0.0.0.0:{port}");
+
 if (isProduction)
 {
     app.UseHttpsRedirection();
@@ -370,7 +373,8 @@ if (isProduction)
         await next();
     });
 }
-
+app.MapGet("/", () => Results.Ok("Healthy ✅"));
+app.MapGet("/health", () => Results.Ok(new { status = "Healthy", time = DateTime.UtcNow }));
 Console.WriteLine("🚀 Application starting...");
 
 app.Run();
