@@ -2,12 +2,17 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Copy solution file and project file
+# Copy solution file first
 COPY ClientPortal.sln ./
-COPY Server/Server.csproj ./Server/
+
+# Copy all csproj files
+COPY Server/*.csproj ./Server/
+# Copy any other project files if they exist
+# COPY Client/*.csproj ./Client/ (uncomment if you have a client .csproj)
+
 RUN dotnet restore ClientPortal.sln
 
-# Copy everything else and build
+# Copy everything else
 COPY . .
 RUN dotnet build ClientPortal.sln --no-restore -c Release -o /app/build
 
@@ -15,7 +20,7 @@ RUN dotnet build ClientPortal.sln --no-restore -c Release -o /app/build
 FROM build AS publish
 RUN dotnet publish Server/Server.csproj --no-build -c Release -o /app/publish
 
-# Runtime stage
+# Runtime stage  
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 
