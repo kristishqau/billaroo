@@ -16,6 +16,8 @@ var builder = WebApplication.CreateBuilder(args);
 var isDevelopment = builder.Environment.IsDevelopment();
 var isProduction = builder.Environment.IsProduction();
 
+Console.WriteLine($"🔧 Starting application in {builder.Environment.EnvironmentName} environment");
+
 // ---------- Environment-specific configuration ----------
 if (isProduction)
 {
@@ -26,28 +28,38 @@ if (isProduction)
     if (!string.IsNullOrEmpty(databaseUrl))
     {
         builder.Configuration["ConnectionStrings:DefaultConnection"] = databaseUrl;
-        Console.WriteLine("Database URL loaded from environment");
+        Console.WriteLine("✅ Database URL loaded from environment");
     }
     else
     {
-        Console.WriteLine("WARNING: DATABASE_URL not found");
+        Console.WriteLine("❌ WARNING: DATABASE_URL not found");
     }
 
     // JWT
-    builder.Configuration["AppSettings:Token"] = Environment.GetEnvironmentVariable("JWT_TOKEN")
-        ?? builder.Configuration["AppSettings:Token"];
+    var jwtToken = Environment.GetEnvironmentVariable("JWT_TOKEN");
+    if (!string.IsNullOrEmpty(jwtToken))
+    {
+        builder.Configuration["AppSettings:Token"] = jwtToken;
+        Console.WriteLine("✅ JWT Token loaded from environment");
+    }
+
     builder.Configuration["AppSettings:Issuer"] = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "ClientPortalAPI";
     builder.Configuration["AppSettings:Audience"] = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "ClientPortalUsers";
 
-    // Data Protection
+    // Data Protection - Create directory if it doesn't exist
+    var keyPath = "/app/keys";
+    Directory.CreateDirectory(keyPath);
     builder.Services.AddDataProtection()
-        .PersistKeysToFileSystem(new DirectoryInfo("/app/keys"))
+        .PersistKeysToFileSystem(new DirectoryInfo(keyPath))
         .SetApplicationName("ClientPortal")
         .SetDefaultKeyLifetime(TimeSpan.FromDays(90));
 
     // Email
-    builder.Configuration["EmailSettings:Username"] = Environment.GetEnvironmentVariable("EMAIL_USERNAME") ?? builder.Configuration["EmailSettings:Username"];
-    builder.Configuration["EmailSettings:Password"] = Environment.GetEnvironmentVariable("EMAIL_PASSWORD") ?? builder.Configuration["EmailSettings:Password"];
+    var emailUsername = Environment.GetEnvironmentVariable("EMAIL_USERNAME");
+    var emailPassword = Environment.GetEnvironmentVariable("EMAIL_PASSWORD");
+    if (!string.IsNullOrEmpty(emailUsername)) builder.Configuration["EmailSettings:Username"] = emailUsername;
+    if (!string.IsNullOrEmpty(emailPassword)) builder.Configuration["EmailSettings:Password"] = emailPassword;
+
     builder.Configuration["EmailSettings:SmtpServer"] = Environment.GetEnvironmentVariable("SMTP_SERVER") ?? "smtp.gmail.com";
     builder.Configuration["EmailSettings:Port"] = Environment.GetEnvironmentVariable("SMTP_PORT") ?? "587";
     builder.Configuration["EmailSettings:EnableSsl"] = Environment.GetEnvironmentVariable("SMTP_ENABLE_SSL") ?? "true";
@@ -62,17 +74,20 @@ if (isProduction)
     var allowedProdOrigins = Environment.GetEnvironmentVariable("ALLOWED_ORIGINS");
     if (!string.IsNullOrEmpty(allowedProdOrigins))
     {
-        var origins = allowedProdOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(o => o.Trim()).ToArray();
+        var origins = allowedProdOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                       .Select(o => o.Trim())
+                                       .ToArray();
         for (int i = 0; i < origins.Length; i++)
             builder.Configuration[$"CorsSettings:AllowedOrigins:{i}"] = origins[i];
 
-        Console.WriteLine($"CORS origins loaded: {string.Join(", ", origins)}");
+        Console.WriteLine($"✅ CORS origins loaded: {string.Join(", ", origins)}");
     }
     else
     {
+        // Fallback CORS for production
         builder.Configuration["CorsSettings:AllowedOrigins:0"] = "https://yourdomain.com";
         builder.Configuration["CorsSettings:AllowedOrigins:1"] = "https://www.yourdomain.com";
-        Console.WriteLine("Using fallback CORS origins");
+        Console.WriteLine("⚠️ Using fallback CORS origins");
     }
 }
 
@@ -94,7 +109,7 @@ if (isDevelopment)
 
         c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
-            Description = "JWT Authorization header using Bearer scheme",
+            Description = "JWT Authorization header using Bearer scheme. Enter 'Bearer' [space] and then your token.",
             Name = "Authorization",
             In = ParameterLocation.Header,
             Type = SecuritySchemeType.ApiKey,
@@ -117,10 +132,14 @@ if (isDevelopment)
 // ---------- Database ----------
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-                           ?? throw new ArgumentException("Database connection string is not configured.");
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
-    Console.WriteLine($"Using connection string: {connectionString.Substring(0, Math.Min(50, connectionString.Length))}...");
+    if (string.IsNullOrEmpty(connectionString))
+    {
+        throw new ArgumentException("❌ Database connection string is not configured. Set DATABASE_URL environment variable or ConnectionStrings:DefaultConnection in configuration.");
+    }
+
+    Console.WriteLine($"🗄️ Using connection string: {connectionString.Substring(0, Math.Min(50, connectionString.Length))}...");
 
     options.UseNpgsql(connectionString);
 
@@ -143,15 +162,20 @@ builder.Services.AddScoped<ISecurityAuditService, SecurityAuditService>();
 
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 
-// Hosted service only in non-development
-if (!isDevelopment)
+// Hosted service only in production (avoid startup issues in development)
+if (isProduction)
 {
     builder.Services.AddHostedService<SecurityCleanupService>();
 }
 
 // ---------- JWT Authentication ----------
 var jwtKey = Environment.GetEnvironmentVariable("JWT_TOKEN") ?? builder.Configuration["AppSettings:Token"];
-if (string.IsNullOrEmpty(jwtKey)) throw new ArgumentException("JWT Token key is not configured.");
+if (string.IsNullOrEmpty(jwtKey))
+{
+    throw new ArgumentException("❌ JWT Token key is not configured. Set JWT_TOKEN environment variable or AppSettings:Token in configuration.");
+}
+
+Console.WriteLine($"🔐 JWT Key configured (length: {jwtKey.Length})");
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -174,8 +198,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             options.Events = new JwtBearerEvents
             {
-                OnAuthenticationFailed = context => { Console.WriteLine($"Auth failed: {context.Exception.Message}"); return Task.CompletedTask; },
-                OnChallenge = context => { Console.WriteLine($"Challenge: {context.Error}"); return Task.CompletedTask; }
+                OnAuthenticationFailed = context =>
+                {
+                    Console.WriteLine($"🔴 Auth failed: {context.Exception.Message}");
+                    return Task.CompletedTask;
+                },
+                OnChallenge = context =>
+                {
+                    Console.WriteLine($"🟡 Challenge: {context.Error}, {context.ErrorDescription}");
+                    return Task.CompletedTask;
+                }
             };
         }
     });
@@ -192,7 +224,7 @@ builder.Services.AddAuthorization(options =>
 var allowedOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>()
                      ?? new[] { "http://localhost:5173" };
 
-Console.WriteLine($"CORS origins: {string.Join(", ", allowedOrigins)}");
+Console.WriteLine($"🌐 CORS origins: {string.Join(", ", allowedOrigins)}");
 
 builder.Services.AddCors(options =>
 {
@@ -211,21 +243,115 @@ QuestPDF.Settings.License = LicenseType.Community;
 // ---------- Build app ----------
 var app = builder.Build();
 
-// ---------- Middleware ----------
-Console.WriteLine($"Environment: {app.Environment.EnvironmentName}");
-Console.WriteLine($"Content Root: {app.Environment.ContentRootPath}");
-Console.WriteLine($"Web Root: {app.Environment.WebRootPath}");
+// ---------- Configure pipeline ----------
+Console.WriteLine($"🚀 Environment: {app.Environment.EnvironmentName}");
+Console.WriteLine($"📂 Content Root: {app.Environment.ContentRootPath}");
+Console.WriteLine($"🌐 Web Root: {app.Environment.WebRootPath}");
 
+// Development middleware
 if (isDevelopment)
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Client Portal API v1");
+        c.RoutePrefix = "swagger";
+    });
+    app.UseDeveloperExceptionPage();
+}
+else
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
 }
 
-app.UseHttpsRedirection();
-app.UseAuthentication();
-app.UseAuthorization();
+// IMPORTANT: Only redirect to HTTPS if we're confident about the setup
+// Railway and Render handle HTTPS termination differently
+var forceHttps = Environment.GetEnvironmentVariable("FORCE_HTTPS")?.ToLowerInvariant() == "true";
+if (isProduction && forceHttps)
+{
+    app.UseHttpsRedirection();
+    Console.WriteLine("🔒 HTTPS redirection enabled");
+}
+else if (isProduction)
+{
+    Console.WriteLine("⚠️ HTTPS redirection disabled (suitable for Railway/Render)");
+}
+
+// CORS should be early in the pipeline
 app.UseCors("AllowFrontend");
 
+// Static files setup
+if (string.IsNullOrEmpty(app.Environment.WebRootPath))
+{
+    app.Environment.WebRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+}
+
+var uploadsPath = Path.Combine(app.Environment.WebRootPath, "uploads");
+if (!Directory.Exists(uploadsPath))
+{
+    Directory.CreateDirectory(uploadsPath);
+    Console.WriteLine($"📁 Created uploads directory: {uploadsPath}");
+}
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadsPath),
+    RequestPath = "/uploads"
+});
+
+// Authentication & Authorization
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Map controllers
 app.MapControllers();
+
+// Health check endpoints
+app.MapGet("/health", (HttpContext context) =>
+{
+    var response = new
+    {
+        Status = "Healthy",
+        Environment = app.Environment.EnvironmentName,
+        Timestamp = DateTime.UtcNow,
+        DatabaseConfigured = !string.IsNullOrEmpty(builder.Configuration.GetConnectionString("DefaultConnection")),
+        JwtConfigured = !string.IsNullOrEmpty(jwtKey),
+        RequestScheme = context.Request.Scheme,
+        RequestHost = context.Request.Host.ToString(),
+        UserAgent = context.Request.Headers.UserAgent.ToString()
+    };
+
+    Console.WriteLine($"🩺 Health check from {context.Request.Headers.UserAgent} via {context.Request.Scheme}://{context.Request.Host}");
+    return Results.Json(response);
+});
+
+// Separate endpoint for API testing
+app.MapGet("/", () => new
+{
+    Message = "Client Portal API is running",
+    Environment = app.Environment.EnvironmentName,
+    Timestamp = DateTime.UtcNow,
+    Version = "1.0.0"
+});
+
+// Test database connection on startup (production only)
+if (isProduction)
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await context.Database.CanConnectAsync();
+        Console.WriteLine("✅ Database connection test successful");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Database connection test failed: {ex.Message}");
+        // Don't throw here to allow app to start anyway
+    }
+}
+
+Console.WriteLine("🚀 Application starting...");
+
 app.Run();
