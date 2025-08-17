@@ -154,6 +154,7 @@ export const useEmailVerification = () => {
 export const usePhoneVerification = () => {
   const [code, setCode] = useState('');
   const [isSent, setIsSent] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const notification = useNotification();
 
   const handleSendVerification = async (phoneNumber: string) => {
@@ -169,6 +170,12 @@ export const usePhoneVerification = () => {
   };
 
   const handleVerifyPhone = async (onSuccessCallback: () => void) => {
+    if (!code.trim()) {
+      notification.showError('Please enter the verification code.');
+      return;
+    }
+
+    setIsVerifying(true);
     notification.clearNotification();
 
     try {
@@ -176,10 +183,11 @@ export const usePhoneVerification = () => {
       notification.showSuccess('Phone number verified successfully!');
       setIsSent(false);
       setCode('');
-      onSuccessCallback();
-
+      onSuccessCallback(); // This will trigger refetchProfile
     } catch (err: any) {
       notification.showError(err.response?.data?.message || 'Failed to verify phone number.');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -187,6 +195,7 @@ export const usePhoneVerification = () => {
     code,
     setCode,
     isSent,
+    isVerifying,
     handleSendVerification,
     handleVerifyPhone,
     notification

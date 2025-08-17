@@ -26,6 +26,7 @@ interface ContactInfoSectionProps {
   onSubmit: (e: React.FormEvent) => void;
   phoneVerification: PhoneVerificationState;
   notification: UseNotificationReturn;
+  refetchProfile: () => void;
 }
 
 const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
@@ -36,7 +37,8 @@ const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
   updateField,
   onSubmit,
   phoneVerification,
-  notification
+  notification,
+  refetchProfile
 }) => {
   return (
     <section className={styles.sectionContainer}>
@@ -108,7 +110,9 @@ const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
                   />
                   <button
                     type="button"
-                    onClick={() => phoneVerification.handleVerifyPhone(() => {})}
+                    onClick={() => phoneVerification.handleVerifyPhone(() => {
+                      refetchProfile();
+                    })}
                     className={styles.formButton}
                     style={{ fontSize: '0.875rem', padding: 'var(--spacing-sm) var(--spacing-md)' }}
                   >

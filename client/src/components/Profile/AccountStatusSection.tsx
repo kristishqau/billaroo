@@ -3,6 +3,14 @@ import { Shield, CheckCircle, XCircle, Phone, FileText, Info, LogIn, Calendar, U
 import styles from '../../pages/Profile/Profile.module.css';
 import type { UserProfile, AccountStatus, SecuritySettings, ProfileCompletion } from '../../types';
 
+interface PhoneVerification {
+  code: string;
+  setCode: (code: string) => void;
+  isSent: boolean;
+  handleSendVerification: (phoneNumber: string) => void;
+  handleVerifyPhone: (onSuccessCallback: () => void) => Promise<void>;
+}
+
 interface AccountStatusSectionProps {
   profile: UserProfile | null;
   accountStatus: AccountStatus | null;
@@ -13,9 +21,11 @@ interface AccountStatusSectionProps {
     isResending: boolean;
     handleResendVerification: () => void;
   };
+  phoneVerification: PhoneVerification;
   onEnable2FA: () => void;
   onDisable2FA: () => void;
   onIdentityVerification: () => void;
+  refetchProfile: () => void;
 }
 
 const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
@@ -25,9 +35,11 @@ const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
   profileCompletion,
   formatDate,
   emailVerification,
+  phoneVerification,
   onEnable2FA,
   onDisable2FA,
-  onIdentityVerification
+  onIdentityVerification,
+  refetchProfile
 }) => {
   if (!accountStatus || !securitySettings) {
     return null;
@@ -59,8 +71,8 @@ const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
             </div>
           </div>
           {!securitySettings.isEmailVerified && (
-            <button 
-              onClick={emailVerification.handleResendVerification} 
+            <button
+              onClick={emailVerification.handleResendVerification}
               className={styles.formButton}
               disabled={emailVerification.isResending}
             >
@@ -85,8 +97,77 @@ const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
               <p style={{ margin: '4px 0 0 0', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
                 {securitySettings.isPhoneVerified ? 'Phone verified' : 'Phone not verified'}
               </p>
+              {phoneVerification.isSent && !securitySettings.isPhoneVerified && (
+                <div style={{ marginTop: 'var(--spacing-sm)' }}>
+                  <input
+                    type="text"
+                    className={styles.formInput}
+                    value={phoneVerification.code}
+                    onChange={(e) => phoneVerification.setCode(e.target.value)}
+                    placeholder="Enter verification code"
+                    style={{ 
+                      marginBottom: 'var(--spacing-xs)', 
+                      fontSize: '0.875rem',
+                      padding: 'var(--spacing-xs) var(--spacing-sm)'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => phoneVerification.handleVerifyPhone(() => {
+                      refetchProfile();
+                    })}
+                    className={styles.formButton}
+                    style={{ 
+                      fontSize: '0.75rem', 
+                      padding: 'var(--spacing-xs) var(--spacing-sm)',
+                      minHeight: 'auto'
+                    }}
+                  >
+                    Confirm Code
+                  </button>
+                </div>
+              )}
             </div>
           </div>
+          {!securitySettings.isPhoneVerified && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+              {!phoneVerification.isSent ? (
+                <button
+                  onClick={() => {
+                    if (profile?.phoneNumber) {
+                      phoneVerification.handleSendVerification(profile.phoneNumber);
+                    }
+                  }}
+                  className={styles.formButton}
+                  disabled={!profile?.phoneNumber}
+                >
+                  <Phone size={14} />
+                  Verify
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (profile?.phoneNumber) {
+                      phoneVerification.handleSendVerification(profile.phoneNumber);
+                    }
+                  }}
+                  className={styles.formButton}
+                >
+                  Resend Code
+                </button>
+              )}
+              {!profile?.phoneNumber && (
+                <p style={{ 
+                  fontSize: '0.75rem', 
+                  color: 'var(--text-muted)', 
+                  margin: 0,
+                  textAlign: 'center'
+                }}>
+                  Add phone number in Contact Info first
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Two-Factor Authentication */}
@@ -102,7 +183,7 @@ const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
               </p>
             </div>
           </div>
-          <button 
+          <button
             className={styles.formButton}
             onClick={securitySettings.twoFactorEnabled ? onDisable2FA : onEnable2FA}
           >
@@ -129,7 +210,7 @@ const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
             </div>
           </div>
           {!securitySettings.isIdentityVerified && (
-            <button 
+            <button
               className={styles.formButton}
               onClick={onIdentityVerification}
             >
@@ -144,13 +225,13 @@ const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
       <div style={{ display: 'grid', gap: 'var(--spacing-sm)', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
         {/* Account Status */}
         <div className={styles.infoCard}>
-          <Info size={20} className={styles.infoIcon} style={{ 
-            color: accountStatus.isAccountLocked ? 'var(--danger)' : 'var(--success)' 
+          <Info size={20} className={styles.infoIcon} style={{
+            color: accountStatus.isAccountLocked ? 'var(--danger)' : 'var(--success)'
           }} />
           <div style={{ flex: 1 }}>
             <p className={styles.infoText}>
               <span style={{ fontWeight: '600' }}>Account Status:</span>{' '}
-              <span style={{ 
+              <span style={{
                 color: accountStatus.isAccountLocked ? 'var(--danger)' : 'var(--success)',
                 fontWeight: '600'
               }}>
@@ -180,8 +261,8 @@ const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
             </p>
             {accountStatus.lastLoginAt && (
               <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                {new Date(accountStatus.lastLoginAt).toLocaleDateString() === new Date().toLocaleDateString() 
-                  ? 'Today' 
+                {new Date(accountStatus.lastLoginAt).toLocaleDateString() === new Date().toLocaleDateString()
+                  ? 'Today'
                   : `${Math.floor((new Date().getTime() - new Date(accountStatus.lastLoginAt).getTime()) / (1000 * 60 * 60 * 24))} days ago`}
               </p>
             )}
@@ -209,26 +290,26 @@ const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
             <div style={{ flex: 1 }}>
               <p className={styles.infoText}>
                 <span style={{ fontWeight: '600' }}>Profile Completion:</span>{' '}
-                <span style={{ 
-                  color: profileCompletion.completionPercentage >= 80 ? 'var(--success)' : 
+                <span style={{
+                  color: profileCompletion.completionPercentage >= 80 ? 'var(--success)' :
                         profileCompletion.completionPercentage >= 50 ? 'var(--warning)' : 'var(--danger)',
                   fontWeight: '600'
                 }}>
                   {profileCompletion.completionPercentage}%
                 </span>
               </p>
-              <div style={{ 
-                width: '100%', 
-                height: '6px', 
-                backgroundColor: 'var(--bg-tertiary)', 
-                borderRadius: '3px', 
+              <div style={{
+                width: '100%',
+                height: '6px',
+                backgroundColor: 'var(--bg-tertiary)',
+                borderRadius: '3px',
                 marginTop: 'var(--spacing-xs)',
                 overflow: 'hidden'
               }}>
                 <div style={{
                   width: `${profileCompletion.completionPercentage}%`,
                   height: '100%',
-                  background: profileCompletion.completionPercentage >= 80 ? 'var(--success)' : 
+                  background: profileCompletion.completionPercentage >= 80 ? 'var(--success)' :
                             profileCompletion.completionPercentage >= 50 ? 'var(--warning)' : 'var(--danger)',
                   transition: 'width 0.3s ease'
                 }} />

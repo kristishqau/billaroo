@@ -21,12 +21,6 @@ export default function NotFound() {
           >
             Go to Home
           </Link>
-          <Link 
-            to="/login" 
-            className={styles.secondaryButton}
-          >
-            Back to Login
-          </Link>
         </div>
         
         <div className={styles.footerText}>

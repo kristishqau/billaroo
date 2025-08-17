@@ -238,6 +238,7 @@ export default function Profile() {
                   handleVerifyPhone: phoneVerification.handleVerifyPhone
                 }}
                 notification={profileForms.contactNotification}
+                refetchProfile={refetchProfile}
               />
             </div>
           )}
@@ -287,9 +288,17 @@ export default function Profile() {
                   isResending: emailVerification.isResending,
                   handleResendVerification: emailVerification.handleResendVerification
                 }}
+                phoneVerification={{
+                  code: phoneVerification.code,
+                  setCode: phoneVerification.setCode,
+                  isSent: phoneVerification.isSent,
+                  handleSendVerification: phoneVerification.handleSendVerification,
+                  handleVerifyPhone: phoneVerification.handleVerifyPhone
+                }}
                 onEnable2FA={twoFactorAuth.handleEnable2FA}
                 onDisable2FA={twoFactorAuth.handleDisable2FA}
                 onIdentityVerification={() => identityVerification.setShowModal(true)}
+                refetchProfile={refetchProfile}
               />
 
               <PasswordChangeSection
