@@ -153,7 +153,7 @@ const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
       </div>
 
       {/* Account Information Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+      <div style={{ display: 'grid', gap: 'var(--spacing-sm)', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
         {/* Account Status */}
         <div className={styles.infoCard}>
           <Info size={20} className={styles.infoIcon} style={{ 

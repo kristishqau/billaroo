@@ -59,7 +59,7 @@ const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
       
       {!isEditing ? (
         <div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
+          <div style={{ display: 'grid', gap: 'var(--spacing-sm)', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>Phone Number</label>
               <div style={{ position: 'relative' }}>
