@@ -22,7 +22,12 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 }) => {
   return (
     <header className={styles.profileHeader}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 'var(--spacing-xl)', alignItems: 'start' }}>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'auto 1fr auto', 
+        gap: 'var(--spacing-xl)', 
+        alignItems: 'start'
+      }} className="profile-header-grid">
         
         {/* Avatar Section */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' }}>
@@ -114,11 +119,11 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </div>
 
           {/* Quick Info Grid */}
-          <div style={{ 
+          <div className="profile-info-grid" style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
             gap: 'var(--spacing-sm)', 
-            marginBottom: 'var(--spacing-lg)' 
+            marginBottom: 'var(--spacing-lg)'
           }}>
             {profile?.email && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
@@ -192,7 +197,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         </div>
 
         {/* Profile Completion Section */}
-        <div style={{ minWidth: '250px' }}>
+        <div className="profile-completion-container" style={{ minWidth: '250px' }}>
           {profileCompletion && (
             <div style={{
               background: 'rgba(30, 41, 59, 0.6)',
@@ -232,7 +237,16 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 height: '120px', 
                 margin: '0 auto var(--spacing-md) auto' 
               }}>
-                <svg width="120" height="120" style={{ transform: 'rotate(-90deg)' }}>
+                <svg 
+                  width="120" 
+                  height="120" 
+                  style={{ 
+                    transform: 'rotate(-90deg)',
+                    maxWidth: '100%',
+                    height: 'auto'
+                  }}
+                  viewBox="0 0 120 120"
+                >
                   <circle
                     cx="60"
                     cy="60"

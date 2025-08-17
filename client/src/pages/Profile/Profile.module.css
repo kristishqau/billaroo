@@ -91,6 +91,13 @@
   text-align: center;
 }
 
+.profile-header-grid {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--spacing-xl);
+  align-items: start;
+}
+
 .profileAvatar {
   width: 120px;
   height: 120px;
@@ -1068,6 +1075,29 @@
     height: 48px;
   }
 
+  .profile-header-grid {
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: var(--spacing-lg);
+  }
+  
+  .profile-info-grid {
+    grid-template-columns: 1fr !important;
+    justify-items: center;
+    gap: var(--spacing-xs) !important;
+  }
+  
+  .profile-info-grid > div {
+    justify-content: center;
+  }
+  
+  .profile-completion-container {
+    min-width: unset !important;
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+
   .profileUsername {
     font-size: 1.875rem;
   }
@@ -1151,6 +1181,27 @@
 @media (max-width: 480px) {
   .profileContent {
     padding: var(--spacing-md);
+  }
+
+  .profile-header-grid {
+    gap: var(--spacing-md);
+  }
+  
+  .profile-info-grid {
+    gap: var(--spacing-xs) !important;
+  }
+  
+  .profile-completion-container {
+    max-width: 280px;
+  }
+  
+  .profile-completion-container svg {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .profile-completion-container svg circle {
+    r: 42;
   }
   
   .tabNavigation {
