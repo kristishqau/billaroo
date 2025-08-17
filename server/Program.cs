@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
@@ -49,6 +50,10 @@ if (isProduction)
 
     builder.Configuration["AppSettings:Issuer"] = jwtIssuer;
     builder.Configuration["AppSettings:Audience"] = jwtAudience;
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo("/app/keys"))
+        .SetApplicationName("ClientPortal")
+        .SetDefaultKeyLifetime(TimeSpan.FromDays(90));
 
     // Email Settings
     var emailUsername = Environment.GetEnvironmentVariable("EMAIL_USERNAME");
@@ -316,13 +321,19 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Health check endpoint
-app.MapGet("/health", () => new
+app.MapGet("/health", (HttpContext context) =>
 {
-    Status = "Healthy",
-    Environment = app.Environment.EnvironmentName,
-    Timestamp = DateTime.UtcNow,
-    DatabaseConfigured = !string.IsNullOrEmpty(builder.Configuration.GetConnectionString("DefaultConnection")),
-    JwtConfigured = !string.IsNullOrEmpty(jwtKey)
+    // Allow health checks over HTTP (for Railway's internal health checker)
+    return Results.Json(new
+    {
+        Status = "Healthy",
+        Environment = app.Environment.EnvironmentName,
+        Timestamp = DateTime.UtcNow,
+        DatabaseConfigured = !string.IsNullOrEmpty(builder.Configuration.GetConnectionString("DefaultConnection")),
+        JwtConfigured = !string.IsNullOrEmpty(jwtKey),
+        RequestScheme = context.Request.Scheme,
+        RequestHost = context.Request.Host.ToString()
+    });
 });
 
 // Test database connection on startup (production only)
@@ -339,6 +350,25 @@ if (isProduction)
     {
         Console.WriteLine($"❌ Database connection test failed: {ex.Message}");
     }
+}
+
+if (isProduction)
+{
+    app.UseHttpsRedirection();
+
+    // Add HSTS for security
+    app.UseHsts();
+
+    // Add security headers
+    app.Use(async (context, next) =>
+    {
+        context.Response.Headers.Add("X-Frame-Options", "DENY");
+        context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
+        context.Response.Headers.Add("Referrer-Policy", "strict-origin-when-cross-origin");
+        context.Response.Headers.Add("X-XSS-Protection", "1; mode=block");
+
+        await next();
+    });
 }
 
 Console.WriteLine("🚀 Application starting...");
