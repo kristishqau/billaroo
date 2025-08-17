@@ -3,8 +3,7 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 # Copy solution file and project file
-COPY ClientPortal.sln ./
-COPY Server/Server.csproj ./Server/
+COPY . .
 RUN dotnet restore ClientPortal.sln
 
 # Copy everything else and build
