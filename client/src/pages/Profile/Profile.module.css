@@ -1,5 +1,5 @@
 /* ==========================================================================
-   PROFILE PAGE STYLES - BILLAROO THEME
+   PROFILE PAGE STYLES - BILLAROO THEME - ENHANCED UI/UX
    ========================================================================== */
 
 :root {
@@ -74,7 +74,7 @@
   position: relative;
   z-index: 1;
   padding: var(--spacing-xl);
-  max-width: 900px; /* Adjusted max-width for profile page */
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -88,13 +88,7 @@
   box-shadow: var(--shadow-lg);
   position: relative;
   overflow: hidden;
-  text-align: center; /* Center content in header */
-  padding-bottom: var(--spacing-lg); /* Adjust padding */
-}
-
-.profileHeader::before {
-  /* Remove the top border gradient if not desired for profile header */
-  content: none;
+  text-align: center;
 }
 
 .profileAvatar {
@@ -108,6 +102,12 @@
   margin: 0 auto var(--spacing-md) auto;
   box-shadow: var(--shadow-md);
   border: 4px solid var(--border);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.profileAvatar:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-xl);
 }
 
 .profileAvatar svg {
@@ -123,7 +123,7 @@
   background: var(--gradient-primary);
   -webkit-background-clip: text;
   background-clip: text;
-  color: transparent; /* Use transparent to show gradient */
+  color: transparent;
   letter-spacing: -0.02em;
 }
 
@@ -136,6 +136,141 @@
   margin: 0 0 var(--spacing-lg) 0;
 }
 
+/* ==========================================================================
+   TAB NAVIGATION - NEW DESIGN
+   ========================================================================== */
+
+.tabNavigation {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xl);
+  padding: var(--spacing-sm);
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.tabNavigation::-webkit-scrollbar {
+  display: none;
+}
+
+.tabButton {
+  flex: 1;
+  min-width: 200px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.tabButton::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--gradient-primary);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  border-radius: var(--radius-lg);
+}
+
+.tabButton:hover::before {
+  opacity: 0.1;
+}
+
+.tabButtonActive {
+  background: var(--gradient-primary);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.tabButtonActive::before {
+  opacity: 0;
+}
+
+.tabButtonContent {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.tabButtonHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+}
+
+.tabButtonActive .tabButtonHeader {
+  color: var(--text-primary);
+}
+
+.tabButtonLabel {
+  white-space: nowrap;
+}
+
+.tabButtonActive .tabCompletionProgress {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.tabButtonActive {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* ==========================================================================
+   TAB CONTENT
+   ========================================================================== */
+
+.tabContent {
+  min-height: 500px;
+}
+
+.tabPanel {
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    width: 0;
+  }
+  to {
+    width: 40px;
+  }
+}
+
+/* ==========================================================================
+   SECTION STYLES - ENHANCED
+   ========================================================================== */
+
 .sectionContainer {
   background: var(--bg-glass);
   backdrop-filter: blur(20px);
@@ -144,10 +279,33 @@
   padding: var(--spacing-xl);
   margin-bottom: var(--spacing-xl);
   box-shadow: var(--shadow-lg);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.sectionContainer::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--gradient-primary);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sectionContainer:hover::before {
+  opacity: 0.5;
+}
+
+.sectionContainer:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-xl);
 }
 
 .sectionTitle {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 var(--spacing-lg) 0;
@@ -155,10 +313,24 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+  position: relative;
+  padding-bottom: var(--spacing-md);
+}
+
+.sectionTitle::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 40px;
+  height: 2px;
+  background: var(--gradient-primary);
+  border-radius: 1px;
 }
 
 .formGroup {
   margin-bottom: var(--spacing-lg);
+  position: relative;
 }
 
 .formLabel {
@@ -167,6 +339,12 @@
   font-weight: 600;
   color: var(--text-muted);
   margin-bottom: var(--spacing-sm);
+  transition: color 0.3s ease;
+}
+
+.formInput:focus + .formLabel,
+.formSelect:focus + .formLabel {
+  color: var(--primary);
 }
 
 .formInput,
@@ -178,8 +356,9 @@
   background: var(--bg-secondary);
   color: var(--text-primary);
   font-size: 1rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  box-sizing: border-box; /* Ensure padding doesn't increase width */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+  position: relative;
 }
 
 .formInput:focus,
@@ -187,19 +366,27 @@
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+  transform: translateY(-1px);
+  background: rgba(30, 41, 59, 0.9);
 }
 
 .formInput::placeholder {
   color: var(--text-muted);
+  transition: opacity 0.3s ease;
 }
 
+.formInput:focus::placeholder {
+  opacity: 0.7;
+}
+
+/* Enhanced Form Buttons */
 .formButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
   font-size: 0.95rem;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   text-decoration: none;
   position: relative;
@@ -212,6 +399,7 @@
   padding: var(--spacing-md) var(--spacing-xl);
   font-size: 1rem;
   box-shadow: var(--shadow-md);
+  gap: var(--spacing-sm);
 }
 
 .formButton::before {
@@ -223,7 +411,7 @@
   height: 100%;
   background: linear-gradient(90deg, 
       transparent, 
-      rgba(255, 255, 255, 0.15), 
+      rgba(255, 255, 255, 0.2), 
       transparent
   );
   transition: left 0.5s ease;
@@ -233,10 +421,15 @@
   left: 100%;
 }
 
-.formButton:hover {
+.formButton:hover:not(:disabled) {
   background: linear-gradient(135deg, var(--primary-dark) 0%, #6d4c9b 100%);
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
+}
+
+.formButton:active:not(:disabled) {
+  transform: translateY(0);
+  transition: transform 0.1s ease;
 }
 
 .formButton:disabled {
@@ -247,59 +440,51 @@
   transform: none;
 }
 
-.messageSuccess {
-  background: rgba(16, 185, 129, 0.2); /* Green with transparency */
-  color: var(--success);
-  padding: var(--spacing-md);
-  border-radius: var(--radius-md);
-  margin-top: var(--spacing-lg);
-  margin-bottom: var(--spacing-lg);
-  display: flex;
+.exportButton {
+  display: inline-flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  font-weight: 500;
-  border: 1px solid var(--success);
-}
-
-.messageError {
-  background: rgba(239, 68, 68, 0.2); /* Red with transparency */
-  color: var(--danger);
-  padding: var(--spacing-md);
-  border-radius: var(--radius-md);
-  margin-top: var(--spacing-lg);
-  margin-bottom: var(--spacing-lg);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  font-weight: 500;
-  border: 1px solid var(--danger);
-}
-
-.infoCard {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
-  margin-bottom: var(--spacing-lg);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  box-shadow: var(--shadow-sm);
-}
-
-.infoIcon {
-  color: var(--primary);
-  flex-shrink: 0;
-}
-
-.infoText {
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-  line-height: 1.4;
-}
-
-.infoText span {
+  justify-content: center;
   font-weight: 600;
+  font-size: 0.95rem;
+  border-radius: var(--radius-lg);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  border: none;
+  white-space: nowrap;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  padding: var(--spacing-md) var(--spacing-xl);
+  font-size: 1rem;
+  gap: var(--spacing-sm);
+}
+
+.exportButton::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+      transparent, 
+      rgba(255, 255, 255, 0.1), 
+      transparent
+  );
+  transition: left 0.5s ease;
+}
+
+.exportButton:hover:not(:disabled)::before {
+  left: 100%;
+}
+
+.exportButton:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
   color: var(--text-primary);
 }
 
@@ -309,7 +494,7 @@
   justify-content: center;
   font-weight: 600;
   font-size: 0.95rem;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   text-decoration: none;
   position: relative;
@@ -322,6 +507,7 @@
   box-shadow: var(--shadow-md);
   padding: var(--spacing-md) var(--spacing-xl);
   font-size: 1rem;
+  gap: var(--spacing-sm);
 }
 
 .deleteButton::before {
@@ -343,76 +529,286 @@
   left: 100%;
 }
 
-.deleteButton:hover {
-  background: #dc2626; /* Darker red */
+.deleteButton:hover:not(:disabled) {
+  background: #dc2626;
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
 }
 
-.exportButton {
-  display: inline-flex;
+/* Enhanced Message Styles */
+.messageSuccess {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  margin: var(--spacing-lg) 0;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 0.95rem;
-  border-radius: 12px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  text-decoration: none;
-  position: relative;
-  overflow: hidden;
-  cursor: pointer;
-  border: none;
-  white-space: nowrap;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
-  padding: var(--spacing-md) var(--spacing-xl);
-  font-size: 1rem;
+  gap: var(--spacing-sm);
+  font-weight: 500;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  backdrop-filter: blur(10px);
+  animation: slideInDown 0.3s ease;
 }
 
-.exportButton::before {
+.messageError {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  margin: var(--spacing-lg) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-weight: 500;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  backdrop-filter: blur(10px);
+  animation: slideInDown 0.3s ease;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Enhanced Info Cards */
+.infoCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.infoCard::before {
   content: '';
   position: absolute;
   top: 0;
-  left: -100%;
-  width: 100%;
+  left: 0;
+  width: 3px;
   height: 100%;
-  background: linear-gradient(90deg, 
-      transparent, 
-      rgba(255, 255, 255, 0.15), 
-      transparent
-  );
-  transition: left 0.5s ease;
+  background: var(--gradient-primary);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
-.exportButton:hover:not(:disabled)::before {
-  left: 100%;
+.infoCard:hover::before {
+  opacity: 1;
 }
 
-.exportButton:hover {
-  background: var(--bg-tertiary);
+.infoCard:hover {
+  background: rgba(30, 41, 59, 0.9);
   border-color: var(--border-hover);
+  transform: translateX(5px);
+}
+
+.infoIcon {
+  color: var(--primary);
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.infoCard:hover .infoIcon {
+  transform: scale(1.1);
+}
+
+.infoText {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.infoText span {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Enhanced Security Cards */
+.securityCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.securityCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  transition: opacity 0.3s ease;
+}
+
+.securityCard.verified::before {
+  background: var(--success);
+  opacity: 1;
+}
+
+.securityCard.unverified::before {
+  background: var(--danger);
+  opacity: 1;
+}
+
+.securityCard.warning::before {
+  background: var(--warning);
+  opacity: 1;
+}
+
+.securityCard.info::before {
+  background: var(--info);
+  opacity: 1;
+}
+
+.securityCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  background: rgba(30, 41, 59, 0.9);
+}
+
+.statusIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.statusIcon.success {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--success);
+}
+
+.statusIcon.danger {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+}
+
+.statusIcon.warning {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--warning);
+}
+
+.statusIcon.info {
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--info);
+}
+
+/* Enhanced Skills */
+.skillCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.skillCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--gradient-primary);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+  transform-origin: left;
+}
+
+.skillCard:hover::before {
+  transform: scaleX(1);
+}
+
+.skillCard:hover {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: var(--border-hover);
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-lg);
+}
+
+.emptyState {
+  text-align: center;
+  padding: var(--spacing-2xl);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--border);
+  transition: all 0.3s ease;
+}
+
+.emptyState:hover {
+  border-color: var(--border-hover);
+  background: rgba(30, 41, 59, 0.7);
+}
+
+.miniButton {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: var(--text-primary);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.miniButton:hover:not(:disabled) {
+  background: var(--primary-dark);
   transform: translateY(-1px);
 }
 
-/* Modal Styles */
+.miniButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Enhanced Modal Styles */
 .modalOverlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   animation: fadeIn 0.3s ease-out forwards;
+  backdrop-filter: blur(5px);
 }
 
 .modalContent {
   background: var(--bg-glass);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(30px);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: var(--spacing-xl);
@@ -420,23 +816,9 @@
   max-width: 500px;
   box-shadow: var(--shadow-xl);
   position: relative;
-  animation: slideInUp 0.3s ease-out forwards;
-}
-
-.modalCloseButton {
-  position: absolute;
-  top: var(--spacing-md);
-  right: var(--spacing-md);
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 1.5rem;
-  transition: color 0.2s ease;
-}
-
-.modalCloseButton:hover {
-  color: var(--danger);
+  animation: slideInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .modalTitle {
@@ -447,25 +829,28 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border);
 }
 
 .modalDescription {
   color: var(--text-secondary);
   margin-bottom: var(--spacing-lg);
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .modalWarning {
-  background: rgba(239, 68, 68, 0.1); /* Light red background */
+  background: rgba(239, 68, 68, 0.1);
   border: 1px solid var(--danger);
   color: var(--danger);
-  padding: var(--spacing-md);
+  padding: var(--spacing-lg);
   border-radius: var(--radius-md);
   margin-bottom: var(--spacing-lg);
   font-size: 0.9rem;
   display: flex;
-  align-items: flex-start; /* Align icon and text at top */
+  align-items: flex-start;
   gap: var(--spacing-sm);
+  backdrop-filter: blur(10px);
 }
 
 .modalWarning ul {
@@ -482,7 +867,9 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--spacing-md);
-  margin-top: var(--spacing-lg);
+  margin-top: var(--spacing-xl);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border);
 }
 
 .modalCancelButton {
@@ -491,7 +878,7 @@
   justify-content: center;
   font-weight: 600;
   font-size: 0.95rem;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   text-decoration: none;
   position: relative;
@@ -503,22 +890,51 @@
   color: var(--text-secondary);
   border: 1px solid var(--border);
   padding: var(--spacing-md) var(--spacing-xl);
+  gap: var(--spacing-sm);
 }
 
 .modalCancelButton:hover {
   background: var(--bg-tertiary);
   border-color: var(--border-hover);
   transform: translateY(-1px);
+  color: var(--text-primary);
 }
 
 .modalConfirmButton {
-  /* Composes from deleteButton in this module */
-  composes: deleteButton;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border-radius: var(--radius-lg);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  border: none;
+  white-space: nowrap;
+  background: var(--danger);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
   padding: var(--spacing-md) var(--spacing-xl);
+  gap: var(--spacing-sm);
+}
+
+.modalConfirmButton:hover:not(:disabled) {
+  background: #dc2626;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.modalConfirmButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* ==========================================================================
-   LOADING & ERROR STATES
+   LOADING & ERROR STATES - ENHANCED
    ========================================================================== */
 
 .loadingContainer {
@@ -548,12 +964,21 @@
   color: var(--text-muted);
   font-size: 1.125rem;
   font-weight: 500;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 .errorContainer {
   text-align: center;
   padding: var(--spacing-2xl);
   color: var(--danger);
+  background: var(--bg-glass);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
 }
 
 .errorIcon {
@@ -596,12 +1021,39 @@
 }
 
 @keyframes slideInUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from { 
+    transform: translateY(30px) scale(0.9); 
+    opacity: 0; 
+  }
+  to { 
+    transform: translateY(0) scale(1); 
+    opacity: 1; 
+  }
 }
 
-/* Responsive adjustments */
+/* ==========================================================================
+   RESPONSIVE DESIGN - ENHANCED
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  .profileContent {
+    max-width: 900px;
+  }
+  
+  .tabNavigation {
+    padding: var(--spacing-xs);
+  }
+  
+  .tabButton {
+    min-width: 160px;
+  }
+}
+
 @media (max-width: 768px) {
+  .profileContent {
+    padding: var(--spacing-lg);
+  }
+
   .profileHeader {
     padding: var(--spacing-lg);
   }
@@ -620,18 +1072,37 @@
     font-size: 1.875rem;
   }
 
+  .tabNavigation {
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+  }
+
+  .tabButton {
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .tabButtonContent {
+    gap: var(--spacing-xs);
+  }
+
+  .tabButtonHeader {
+    font-size: 0.875rem;
+  }
+
   .sectionContainer {
     padding: var(--spacing-lg);
   }
 
   .sectionTitle {
     font-size: 1.25rem;
+    flex-wrap: wrap;
   }
 
   .formInput,
   .formSelect {
-    padding: var(--spacing-sm);
-    font-size: 0.9rem;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.95rem;
   }
 
   .formButton,
@@ -645,14 +1116,17 @@
 
   .modalContent {
     padding: var(--spacing-lg);
+    width: 95%;
   }
 
   .modalTitle {
     font-size: 1.25rem;
+    flex-wrap: wrap;
   }
 
   .modalActions {
     flex-direction: column;
+    gap: var(--spacing-sm);
   }
 
   .modalCancelButton,
@@ -660,4 +1134,68 @@
     width: 100%;
     justify-content: center;
   }
+
+  .infoCard {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .securityCard {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .profileContent {
+    padding: var(--spacing-md);
+  }
+  
+  .tabNavigation {
+    flex-direction: column;
+  }
+  
+  .tabButton {
+    min-width: unset;
+    width: 100%;
+  }
+  
+  .tabButtonContent {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+}
+
+/* ==========================================================================
+   ACCESSIBILITY & FOCUS STATES
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.tabButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.formInput:focus-visible,
+.formSelect:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+}
+
+.formButton:focus-visible,
+.exportButton:focus-visible,
+.deleteButton:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
 }

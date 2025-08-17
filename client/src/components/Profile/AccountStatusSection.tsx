@@ -53,7 +53,7 @@ const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
       )}
 
       {/* Verification Status Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+      <div style={{ display: 'grid', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
         {/* Email Verification */}
         <div className={`${styles.securityCard} ${securitySettings.isEmailVerified ? styles.verified : styles.unverified}`}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
@@ -153,7 +153,7 @@ const AccountStatusSection: React.FC<AccountStatusSectionProps> = ({
       </div>
 
       {/* Account Information Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--spacing-md)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-md)' }}>
         {/* Account Status */}
         <div className={styles.infoCard}>
           <Info size={20} className={styles.infoIcon} style={{ 

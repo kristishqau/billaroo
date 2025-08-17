@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import styles from './Profile.module.css'
 import Navbar from '../../components/Navbar/Navbar'
-import { RefreshCw, XCircle } from 'lucide-react'
+import { RefreshCw, XCircle, User, Shield, Settings, FileText, Award } from 'lucide-react'
 import Notification from '../../components/Notification/Notification'
 import { useNotification } from '../../hooks/useNotification'
 
@@ -32,8 +32,11 @@ import DeleteAccountModal from '../../components/Profile/DeleteAccountModal'
 import TwoFactorAuthModal from '../../components/Profile/TwoFactorAuthModal'
 import IdentityVerificationModal from '../../components/Profile/IdentityVerificationModal'
 
+type TabType = 'profile' | 'security' | 'preferences' | 'professional' | 'documents'
+
 export default function Profile() {
   const showNotification = useNotification()
+  const [activeTab, setActiveTab] = useState<TabType>('profile')
 
   // Core profile data
   const {
@@ -107,6 +110,14 @@ export default function Profile() {
     e.target.value = ''
   }
 
+  const tabs = [
+    { id: 'profile' as TabType, label: 'Profile', icon: User },
+    { id: 'professional' as TabType, label: 'Professional', icon: Award },
+    { id: 'security' as TabType, label: 'Security', icon: Shield },
+    { id: 'preferences' as TabType, label: 'Preferences', icon: Settings },
+    { id: 'documents' as TabType, label: 'Documents', icon: FileText },
+  ]
+
   // Display loading state
   if (loading) {
     return (
@@ -153,167 +164,203 @@ export default function Profile() {
           notification={fileUpload.profileImageNotification}
         />
 
-        {/* Personal Information Section */}
-        <PersonalInfoSection
-          profile={profile}
-          isEditing={profileForms.isEditingPersonalInfo}
-          setIsEditing={profileForms.setIsEditingPersonalInfo}
-          formData={{
-            firstName: profileForms.formData.firstName,
-            lastName: profileForms.formData.lastName,
-            bio: profileForms.formData.bio
-          }}
-          updateField={profileForms.updateField}
-          onSubmit={profileForms.handlePersonalInfoUpdate}
-          notification={profileForms.personalNotification}
-        />
+        {/* Tab Navigation */}
+        <div className={styles.tabNavigation}>
+          {tabs.map((tab) => {
+            const IconComponent = tab.icon
+            const isActive = activeTab === tab.id
+            
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`${styles.tabButton} ${isActive ? styles.tabButtonActive : ''}`}
+              >
+                <div className={styles.tabButtonContent}>
+                  <div className={styles.tabButtonHeader}>
+                    <IconComponent size={20} />
+                    <span className={styles.tabButtonLabel}>{tab.label}</span>
+                  </div>
+                </div>
+                {isActive && <div className={styles.tabIndicator} />}
+              </button>
+            )
+          })}
+        </div>
 
-        {/* Profile Information Section */}
-        <ProfileInfoSection
-          profile={profile}
-          isEditing={profileForms.isEditingProfile}
-          setIsEditing={profileForms.setIsEditingProfile}
-          formData={{
-            username: profileForms.formData.username,
-            email: profileForms.formData.email
-          }}
-          updateField={profileForms.updateField}
-          onSubmit={profileForms.handleProfileUpdate}
-          notification={profileForms.profileNotification}
-        />
+        {/* Tab Content */}
+        <div className={styles.tabContent}>
+          {activeTab === 'profile' && (
+            <div className={styles.tabPanel}>
+              <PersonalInfoSection
+                profile={profile}
+                isEditing={profileForms.isEditingPersonalInfo}
+                setIsEditing={profileForms.setIsEditingPersonalInfo}
+                formData={{
+                  firstName: profileForms.formData.firstName,
+                  lastName: profileForms.formData.lastName,
+                  bio: profileForms.formData.bio
+                }}
+                updateField={profileForms.updateField}
+                onSubmit={profileForms.handlePersonalInfoUpdate}
+                notification={profileForms.personalNotification}
+              />
 
-        {/* Professional Information Section */}
-        <ProfessionalInfoSection
-          profile={profile}
-          isEditing={profileForms.isEditingProfessionalInfo}
-          setIsEditing={profileForms.setIsEditingProfessionalInfo}
-          formData={{
-            jobTitle: profileForms.formData.jobTitle,
-            company: profileForms.formData.company,
-            website: profileForms.formData.website,
-            linkedInUrl: profileForms.formData.linkedInUrl,
-            gitHubUrl: profileForms.formData.gitHubUrl,
-            portfolioUrl: profileForms.formData.portfolioUrl
-          }}
-          updateField={profileForms.updateField}
-          onSubmit={profileForms.handleProfessionalInfoUpdate}
-          notification={profileForms.professionalNotification}
-        />
+              <ProfileInfoSection
+                profile={profile}
+                isEditing={profileForms.isEditingProfile}
+                setIsEditing={profileForms.setIsEditingProfile}
+                formData={{
+                  username: profileForms.formData.username,
+                  email: profileForms.formData.email
+                }}
+                updateField={profileForms.updateField}
+                onSubmit={profileForms.handleProfileUpdate}
+                notification={profileForms.profileNotification}
+              />
 
-        {/* Contact Information Section */}
-        <ContactInfoSection
-          profile={profile}
-          isEditing={profileForms.isEditingContactInfo}
-          setIsEditing={profileForms.setIsEditingContactInfo}
-          formData={{
-            phoneNumber: profileForms.formData.phoneNumber,
-            city: profileForms.formData.city,
-            country: profileForms.formData.country
-          }}
-          updateField={profileForms.updateField}
-          onSubmit={profileForms.handleContactInfoUpdate}
-          phoneVerification={{
-            code: phoneVerification.code,
-            setCode: phoneVerification.setCode,
-            isSent: phoneVerification.isSent,
-            error: phoneVerification.error,
-            success: phoneVerification.success,
-            handleSendVerification: phoneVerification.handleSendVerification,
-            handleVerifyPhone: phoneVerification.handleVerifyPhone
-          }}
-          notification={profileForms.contactNotification}
-        />
+              <ContactInfoSection
+                profile={profile}
+                isEditing={profileForms.isEditingContactInfo}
+                setIsEditing={profileForms.setIsEditingContactInfo}
+                formData={{
+                  phoneNumber: profileForms.formData.phoneNumber,
+                  city: profileForms.formData.city,
+                  country: profileForms.formData.country
+                }}
+                updateField={profileForms.updateField}
+                onSubmit={profileForms.handleContactInfoUpdate}
+                phoneVerification={{
+                  code: phoneVerification.code,
+                  setCode: phoneVerification.setCode,
+                  isSent: phoneVerification.isSent,
+                  error: phoneVerification.error,
+                  success: phoneVerification.success,
+                  handleSendVerification: phoneVerification.handleSendVerification,
+                  handleVerifyPhone: phoneVerification.handleVerifyPhone
+                }}
+                notification={profileForms.contactNotification}
+              />
+            </div>
+          )}
 
-        {/* Skills Section */}
-        <SkillsSection
-          skills={skillsManagement.skills}
-          newSkillName={skillsManagement.newSkillName}
-          setNewSkillName={skillsManagement.setNewSkillName}
-          newSkillProficiency={skillsManagement.newSkillProficiency}
-          setNewSkillProficiency={skillsManagement.setNewSkillProficiency}
-          isAddingSkill={skillsManagement.isAddingSkill}
-          onAddSkill={skillsManagement.handleAddSkill}
-          onDeleteSkill={skillsManagement.handleDeleteSkill}
-          notification={skillsManagement.notification}
-        />
+          {activeTab === 'professional' && (
+            <div className={styles.tabPanel}>
+              <ProfessionalInfoSection
+                profile={profile}
+                isEditing={profileForms.isEditingProfessionalInfo}
+                setIsEditing={profileForms.setIsEditingProfessionalInfo}
+                formData={{
+                  jobTitle: profileForms.formData.jobTitle,
+                  company: profileForms.formData.company,
+                  website: profileForms.formData.website,
+                  linkedInUrl: profileForms.formData.linkedInUrl,
+                  gitHubUrl: profileForms.formData.gitHubUrl,
+                  portfolioUrl: profileForms.formData.portfolioUrl
+                }}
+                updateField={profileForms.updateField}
+                onSubmit={profileForms.handleProfessionalInfoUpdate}
+                notification={profileForms.professionalNotification}
+              />
 
-        {/* CV/Resume Section */}
-        <CVSection
-          profile={profile}
-          formatDate={formatDate}
-          onCvUpload={handleCvUpload}
-          uploading={fileUpload.uploadingCv}
-          notification={fileUpload.cvNotification}
-        />
+              <SkillsSection
+                skills={skillsManagement.skills}
+                newSkillName={skillsManagement.newSkillName}
+                setNewSkillName={skillsManagement.setNewSkillName}
+                newSkillProficiency={skillsManagement.newSkillProficiency}
+                setNewSkillProficiency={skillsManagement.setNewSkillProficiency}
+                isAddingSkill={skillsManagement.isAddingSkill}
+                onAddSkill={skillsManagement.handleAddSkill}
+                onDeleteSkill={skillsManagement.handleDeleteSkill}
+                notification={skillsManagement.notification}
+              />
+            </div>
+          )}
 
-        {/* Privacy Settings Section */}
-        <PrivacySettingsSection
-          showEmail={privacyAndPreferences.showEmail}
-          setShowEmail={privacyAndPreferences.setShowEmail}
-          showPhone={privacyAndPreferences.showPhone}
-          setShowPhone={privacyAndPreferences.setShowPhone}
-          showAddress={privacyAndPreferences.showAddress}
-          setShowAddress={privacyAndPreferences.setShowAddress}
-          allowMessages={privacyAndPreferences.allowMessages}
-          setAllowMessages={privacyAndPreferences.setAllowMessages}
-          onUpdate={privacyAndPreferences.handlePrivacySettingsUpdate}
-          notification={privacyAndPreferences.privacyNotification}
-        />
+          {activeTab === 'security' && (
+            <div className={styles.tabPanel}>
+              <AccountStatusSection
+                profile={profile}
+                accountStatus={accountStatus}
+                securitySettings={securitySettings}
+                profileCompletion={profileCompletion}
+                formatDate={formatDate}
+                emailVerification={{
+                  isResending: emailVerification.isResending,
+                  message: emailVerification.message,
+                  error: emailVerification.error,
+                  handleResendVerification: emailVerification.handleResendVerification
+                }}
+                onEnable2FA={twoFactorAuth.handleEnable2FA}
+                onDisable2FA={twoFactorAuth.handleDisable2FA}
+                onIdentityVerification={() => identityVerification.setShowModal(true)}
+              />
 
-        {/* Notification Preferences Section */}
-        <NotificationPreferencesSection
-          emailNotifications={privacyAndPreferences.emailNotifications}
-          setEmailNotifications={privacyAndPreferences.setEmailNotifications}
-          smsNotifications={privacyAndPreferences.smsNotifications}
-          setSmsNotifications={privacyAndPreferences.setSmsNotifications}
-          marketingEmails={privacyAndPreferences.marketingEmails}
-          setMarketingEmails={privacyAndPreferences.setMarketingEmails}
-          onUpdate={privacyAndPreferences.handleNotificationPreferencesUpdate}
-          notification={privacyAndPreferences.preferencesNotification}
-        />
+              <PasswordChangeSection
+                currentPassword={passwordChange.currentPassword}
+                setCurrentPassword={passwordChange.setCurrentPassword}
+                newPassword={passwordChange.newPassword}
+                setNewPassword={passwordChange.setNewPassword}
+                confirmNewPassword={passwordChange.confirmNewPassword}
+                setConfirmNewPassword={passwordChange.setConfirmNewPassword}
+                showCurrentPassword={passwordChange.showCurrentPassword}
+                setShowCurrentPassword={passwordChange.setShowCurrentPassword}
+                showNewPassword={passwordChange.showNewPassword}
+                setShowNewPassword={passwordChange.setShowNewPassword}
+                showConfirmNewPassword={passwordChange.showConfirmNewPassword}
+                setShowConfirmNewPassword={passwordChange.setShowConfirmNewPassword}
+                onSubmit={passwordChange.handleChangePassword}
+                notification={passwordChange.notification}
+              />
 
-        {/* Change Password Section */}
-        <PasswordChangeSection
-          currentPassword={passwordChange.currentPassword}
-          setCurrentPassword={passwordChange.setCurrentPassword}
-          newPassword={passwordChange.newPassword}
-          setNewPassword={passwordChange.setNewPassword}
-          confirmNewPassword={passwordChange.confirmNewPassword}
-          setConfirmNewPassword={passwordChange.setConfirmNewPassword}
-          showCurrentPassword={passwordChange.showCurrentPassword}
-          setShowCurrentPassword={passwordChange.setShowCurrentPassword}
-          showNewPassword={passwordChange.showNewPassword}
-          setShowNewPassword={passwordChange.setShowNewPassword}
-          showConfirmNewPassword={passwordChange.showConfirmNewPassword}
-          setShowConfirmNewPassword={passwordChange.setShowConfirmNewPassword}
-          onSubmit={passwordChange.handleChangePassword}
-          notification={passwordChange.notification}
-        />
+              <AccountManagementSection
+                onExportData={accountManagement.handleExportData}
+                onDeleteAccount={() => accountManagement.setShowDeleteModal(true)}
+                notification={accountManagement.notification}
+              />
+            </div>
+          )}
 
-        {/* Account Status Section */}
-        <AccountStatusSection
-          profile={profile}
-          accountStatus={accountStatus}
-          securitySettings={securitySettings}
-          profileCompletion={profileCompletion}
-          formatDate={formatDate}
-          emailVerification={{
-            isResending: emailVerification.isResending,
-            message: emailVerification.message,
-            error: emailVerification.error,
-            handleResendVerification: emailVerification.handleResendVerification
-          }}
-          onEnable2FA={twoFactorAuth.handleEnable2FA}
-          onDisable2FA={twoFactorAuth.handleDisable2FA}
-          onIdentityVerification={() => identityVerification.setShowModal(true)}
-        />
+          {activeTab === 'preferences' && (
+            <div className={styles.tabPanel}>
+              <PrivacySettingsSection
+                showEmail={privacyAndPreferences.showEmail}
+                setShowEmail={privacyAndPreferences.setShowEmail}
+                showPhone={privacyAndPreferences.showPhone}
+                setShowPhone={privacyAndPreferences.setShowPhone}
+                showAddress={privacyAndPreferences.showAddress}
+                setShowAddress={privacyAndPreferences.setShowAddress}
+                allowMessages={privacyAndPreferences.allowMessages}
+                setAllowMessages={privacyAndPreferences.setAllowMessages}
+                onUpdate={privacyAndPreferences.handlePrivacySettingsUpdate}
+                notification={privacyAndPreferences.privacyNotification}
+              />
 
-        {/* Account Management Section */}
-        <AccountManagementSection
-          onExportData={accountManagement.handleExportData}
-          onDeleteAccount={() => accountManagement.setShowDeleteModal(true)}
-          notification={accountManagement.notification}
-        />
+              <NotificationPreferencesSection
+                emailNotifications={privacyAndPreferences.emailNotifications}
+                setEmailNotifications={privacyAndPreferences.setEmailNotifications}
+                smsNotifications={privacyAndPreferences.smsNotifications}
+                setSmsNotifications={privacyAndPreferences.setSmsNotifications}
+                marketingEmails={privacyAndPreferences.marketingEmails}
+                setMarketingEmails={privacyAndPreferences.setMarketingEmails}
+                onUpdate={privacyAndPreferences.handleNotificationPreferencesUpdate}
+                notification={privacyAndPreferences.preferencesNotification}
+              />
+            </div>
+          )}
+
+          {activeTab === 'documents' && (
+            <div className={styles.tabPanel}>
+              <CVSection
+                profile={profile}
+                formatDate={formatDate}
+                onCvUpload={handleCvUpload}
+                uploading={fileUpload.uploadingCv}
+                notification={fileUpload.cvNotification}
+              />
+            </div>
+          )}
+        </div>
 
         {/* Modals */}
         

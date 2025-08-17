@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserIcon, RefreshCw } from 'lucide-react';
+import { UserIcon, RefreshCw, Calendar, MapPin, Mail, Phone, CheckCircle, XCircle } from 'lucide-react';
 import styles from '../../pages/Profile/Profile.module.css';
 import type { UserProfile, ProfileCompletion } from '../../types';
 import type { UseNotificationReturn } from '../../hooks/useNotification';
@@ -22,114 +22,287 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 }) => {
   return (
     <header className={styles.profileHeader}>
-      <div className={styles.profileAvatar}>
-        {profile?.profileImageUrl ? (
-          <img 
-            src={`https://localhost:7263${profile.profileImageUrl}`}
-            alt="Profile" 
-            style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
-            onError={(e) => {
-              console.error('Failed to load profile image:', profile.profileImageUrl);
-              e.currentTarget.style.display = 'none';
-              const parentDiv = e.currentTarget.parentElement;
-              if (parentDiv) {
-                const iconElement = document.createElement('div');
-                iconElement.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
-                iconElement.style.display = 'flex';
-                iconElement.style.alignItems = 'center';
-                iconElement.style.justifyContent = 'center';
-                iconElement.style.width = '100%';
-                iconElement.style.height = '100%';
-                iconElement.style.color = 'var(--text-muted)';
-                parentDiv.appendChild(iconElement);
-              }
-            }}
-          />
-        ) : (
-          <UserIcon />
-        )}
-      </div>
-
-      <h1 className={styles.profileUsername}>
-        {profile?.firstName && profile?.lastName 
-          ? `${profile.firstName} ${profile.lastName}` 
-          : profile?.username}
-      </h1>
-      <p className={styles.profileRole}>{profile?.role}</p>
-      
-      {/* Profile Image Upload */}
-      <div style={{ marginTop: 'var(--spacing-md)' }}>
-        <input
-          type="file"
-          id="profileImageUpload"
-          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-          onChange={onImageUpload}
-          style={{ display: 'none' }}
-        />
-        <button
-          onClick={() => document.getElementById('profileImageUpload')?.click()}
-          className={styles.exportButton}
-          disabled={uploading}
-          style={{ 
-            fontSize: '0.875rem', 
-            padding: 'var(--spacing-sm) var(--spacing-md)',
-            opacity: uploading ? 0.6 : 1,
-            cursor: uploading ? 'not-allowed' : 'pointer'
-          }}
-        >
-          {uploading ? (
-            <>
-              <RefreshCw size={16} className="animate-spin" style={{ marginRight: '6px' }} />
-              Uploading...
-            </>
-          ) : (
-            'Change Photo'
-          )}
-        </button>
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 'var(--spacing-xl)', alignItems: 'start' }}>
         
-        <p style={{ 
-          fontSize: '0.75rem', 
-          color: 'var(--text-muted)', 
-          marginTop: 'var(--spacing-xs)', 
-          textAlign: 'center' 
-        }}>
-          Supported: JPEG, PNG, GIF, WebP (max 5MB)
-        </p>
-      </div>
-
-      {/* Profile Completion Progress */}
-      {profileCompletion && (
-        <div style={{ marginTop: 'var(--spacing-lg)', width: '100%' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-sm)' }}>
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Profile Completion</span>
-            <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)' }}>
-              {profileCompletion.completionPercentage}%
-            </span>
+        {/* Avatar Section */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+          <div className={styles.profileAvatar}>
+            {profile?.profileImageUrl ? (
+              <img 
+                src={`https://localhost:7263${profile.profileImageUrl}`}
+                alt="Profile" 
+                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                onError={(e) => {
+                  console.error('Failed to load profile image:', profile.profileImageUrl);
+                  e.currentTarget.style.display = 'none';
+                  const parentDiv = e.currentTarget.parentElement;
+                  if (parentDiv) {
+                    const iconElement = document.createElement('div');
+                    iconElement.innerHTML = '<svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
+                    iconElement.style.display = 'flex';
+                    iconElement.style.alignItems = 'center';
+                    iconElement.style.justifyContent = 'center';
+                    iconElement.style.width = '100%';
+                    iconElement.style.height = '100%';
+                    iconElement.style.color = 'var(--text-primary)';
+                    parentDiv.appendChild(iconElement);
+                  }
+                }}
+              />
+            ) : (
+              <UserIcon />
+            )}
           </div>
 
-          <div style={{
-            width: '100%',
-            height: '8px',
-            backgroundColor: 'var(--bg-tertiary)',
-            borderRadius: '4px',
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              width: `${profileCompletion.completionPercentage}%`,
-              height: '100%',
-              background: 'var(--gradient-primary)',
-              transition: 'width 0.3s ease'
-            }} />
-          </div>
-
-          {profileCompletion.missingFields.length > 0 && (
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 'var(--spacing-xs)' }}>
-              Missing: {profileCompletion.missingFields.slice(0, 3).join(', ')}
-              {profileCompletion.missingFields.length > 3 && ` +${profileCompletion.missingFields.length - 3} more`}
+          {/* Profile Image Upload */}
+          <div>
+            <input
+              type="file"
+              id="profileImageUpload"
+              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+              onChange={onImageUpload}
+              style={{ display: 'none' }}
+            />
+            <button
+              onClick={() => document.getElementById('profileImageUpload')?.click()}
+              className={styles.exportButton}
+              disabled={uploading}
+              style={{ 
+                fontSize: '0.875rem', 
+                padding: 'var(--spacing-sm) var(--spacing-md)',
+                opacity: uploading ? 0.6 : 1,
+                cursor: uploading ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {uploading ? (
+                <>
+                  <RefreshCw size={16} className="animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                'Change Photo'
+              )}
+            </button>
+            
+            <p style={{ 
+              fontSize: '0.75rem', 
+              color: 'var(--text-muted)', 
+              marginTop: 'var(--spacing-xs)', 
+              textAlign: 'center' 
+            }}>
+              JPEG, PNG, GIF, WebP (max 5MB)
             </p>
+          </div>
+        </div>
+
+        {/* Main Info Section */}
+        <div style={{ minWidth: 0 }}>
+          <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+            <h1 className={styles.profileUsername}>
+              {profile?.firstName && profile?.lastName 
+                ? `${profile.firstName} ${profile.lastName}` 
+                : profile?.username}
+            </h1>
+            <div style={{ gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
+              <p className={styles.profileRole}>{profile?.role}</p>
+              {profile?.company && (
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                  @ {profile.company}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Info Grid */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: 'var(--spacing-sm)', 
+            marginBottom: 'var(--spacing-lg)' 
+          }}>
+            {profile?.email && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
+                <Mail size={16} style={{ color: 'var(--text-muted)' }} />
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                  {profile.email}
+                </span>
+                {profile.isEmailVerified ? (
+                  <CheckCircle size={14} style={{ color: 'var(--success)' }} />
+                ) : (
+                  <XCircle size={14} style={{ color: 'var(--danger)' }} />
+                )}
+              </div>
+            )}
+            
+            {profile?.phoneNumber && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
+                <Phone size={16} style={{ color: 'var(--text-muted)' }} />
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                  {profile.phoneNumber}
+                </span>
+                {profile.isPhoneVerified ? (
+                  <CheckCircle size={14} style={{ color: 'var(--success)' }} />
+                ) : (
+                  <XCircle size={14} style={{ color: 'var(--danger)' }} />
+                )}
+              </div>
+            )}
+            
+            {(profile?.city || profile?.country) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
+                <MapPin size={16} style={{ color: 'var(--text-muted)' }} />
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                  {[profile?.city, profile?.country].filter(Boolean).join(', ')}
+                </span>
+              </div>
+            )}
+            
+            {profile?.createdAt && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
+                <Calendar size={16} style={{ color: 'var(--text-muted)' }} />
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                  Member since {new Date(profile.createdAt).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short' 
+                  })}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Bio Section */}
+          {profile?.bio && (
+            <div style={{ 
+              background: 'rgba(30, 41, 59, 0.5)', 
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)', 
+              padding: 'var(--spacing-md)', 
+              marginBottom: 'var(--spacing-lg)' 
+            }}>
+              <p style={{ 
+                margin: 0, 
+                color: 'var(--text-secondary)', 
+                lineHeight: 1.6,
+                fontSize: '0.95rem'
+              }}>
+                {profile.bio}
+              </p>
+            </div>
           )}
         </div>
-      )}
+
+        {/* Profile Completion Section */}
+        <div style={{ minWidth: '250px' }}>
+          {profileCompletion && (
+            <div style={{
+              background: 'rgba(30, 41, 59, 0.6)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-lg)',
+              padding: 'var(--spacing-lg)'
+            }}>
+              <div style={{ textAlign: 'center', marginBottom: 'var(--spacing-md)' }}>
+                <h3 style={{ 
+                  margin: '0 0 var(--spacing-sm) 0', 
+                  color: 'var(--text-primary)', 
+                  fontSize: '1.1rem',
+                  fontWeight: '600'
+                }}>
+                  Profile Completion
+                </h3>
+                <div style={{
+                  fontSize: '2rem',
+                  fontWeight: '800',
+                  background: profileCompletion.completionPercentage >= 80 
+                    ? 'var(--gradient-primary)' 
+                    : profileCompletion.completionPercentage >= 50 
+                    ? 'linear-gradient(135deg, var(--warning) 0%, #f6ad55 100%)'
+                    : 'linear-gradient(135deg, var(--danger) 0%, #f56565 100%)',
+                  WebkitBackgroundClip: 'text',
+                  backgroundClip: 'text',
+                  color: 'transparent'
+                }}>
+                  {profileCompletion.completionPercentage}%
+                </div>
+              </div>
+
+              {/* Circular Progress */}
+              <div style={{ 
+                position: 'relative', 
+                width: '120px', 
+                height: '120px', 
+                margin: '0 auto var(--spacing-md) auto' 
+              }}>
+                <svg width="120" height="120" style={{ transform: 'rotate(-90deg)' }}>
+                  <circle
+                    cx="60"
+                    cy="60"
+                    r="50"
+                    fill="none"
+                    stroke="rgba(255, 255, 255, 0.1)"
+                    strokeWidth="8"
+                  />
+                  <circle
+                    cx="60"
+                    cy="60"
+                    r="50"
+                    fill="none"
+                    stroke="url(#progressGradient)"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(profileCompletion.completionPercentage / 100) * 314} 314`}
+                    style={{ transition: 'stroke-dasharray 0.5s ease' }}
+                  />
+                  <defs>
+                    <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="var(--primary)" />
+                      <stop offset="100%" stopColor="var(--secondary)" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+
+              {/* Missing Fields */}
+              {profileCompletion.missingFields.length > 0 && (
+                <div>
+                  <h4 style={{ 
+                    margin: '0 0 var(--spacing-sm) 0', 
+                    color: 'var(--text-muted)', 
+                    fontSize: '0.9rem',
+                    fontWeight: '600'
+                  }}>
+                    Complete your profile:
+                  </h4>
+                  <div style={{ flexWrap: 'wrap', gap: 'var(--spacing-xs)' }}>
+                    {profileCompletion.missingFields.slice(0, 4).map((field) => (
+                      <span
+                        key={field}
+                        style={{
+                          fontSize: '0.75rem',
+                          background: 'rgba(245, 158, 11, 0.2)',
+                          color: 'var(--warning)',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          border: '1px solid rgba(245, 158, 11, 0.3)'
+                        }}
+                      >
+                        {field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                      </span>
+                    ))}
+                    {profileCompletion.missingFields.length > 4 && (
+                      <span style={{ 
+                        fontSize: '0.75rem', 
+                        color: 'var(--text-muted)' 
+                      }}>
+                        +{profileCompletion.missingFields.length - 4} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       <Notification 
         notification={notification.notification}
