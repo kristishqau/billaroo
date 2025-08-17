@@ -76,3 +76,4 @@ server/**/obj/
 .env.*
 server/appsettings.json
 server/appsettings.Development.json
+server/appsettings.Production.json
