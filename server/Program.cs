@@ -373,8 +373,18 @@ if (isProduction)
         await next();
     });
 }
-app.MapGet("/", () => Results.Ok("Healthy ✅"));
-app.MapGet("/health", () => Results.Ok(new { status = "Healthy", time = DateTime.UtcNow }));
+
+app.MapGet("/health", () =>
+{
+    return Results.Ok(new
+    {
+        status = "Healthy ✅",
+        timestamp = DateTime.UtcNow
+    });
+});
+
+// (Optional) Root check
+app.MapGet("/", () => Results.Ok("Backend is running 🚀"));
 Console.WriteLine("🚀 Application starting...");
 
 app.Run();
