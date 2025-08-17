@@ -59,7 +59,7 @@ const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
       
       {!isEditing ? (
         <div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--spacing-lg)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>Phone Number</label>
               <div style={{ position: 'relative' }}>
@@ -86,7 +86,7 @@ const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
         </div>
       ) : (
         <form onSubmit={onSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--spacing-lg)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))'}}>
             <div className={styles.formGroup}>
               <label htmlFor="phoneNumber" className={styles.formLabel}>Phone Number</label>
               <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
@@ -97,7 +97,6 @@ const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
                   value={formData.phoneNumber}
                   onChange={(e) => updateField('phoneNumber', e.target.value)}
                   placeholder="+1234567890"
-                  style={{ flex: 1 }}
                 />
                 {!profile?.isPhoneVerified && formData.phoneNumber && (
                   <button
