@@ -12,7 +12,7 @@ RUN dotnet build ClientPortal.sln --no-restore -c Release -o /app/build
 
 # Publish stage
 FROM build AS publish
-RUN dotnet publish Server/Server.csproj --no-build -c Release -o /app/publish
+RUN dotnet publish Server/Server.csproj.user --no-build -c Release -o /app/publish
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
