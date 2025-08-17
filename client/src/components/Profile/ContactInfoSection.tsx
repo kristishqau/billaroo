@@ -86,7 +86,7 @@ const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
         </div>
       ) : (
         <form onSubmit={onSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))'}}>
+          <div style={{ display: 'grid', gap: 'var(--spacing-sm)', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))'}}>
             <div className={styles.formGroup}>
               <label htmlFor="phoneNumber" className={styles.formLabel}>Phone Number</label>
               <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
