@@ -15,6 +15,90 @@ var builder = WebApplication.CreateBuilder(args);
 var isDevelopment = builder.Environment.IsDevelopment();
 var isProduction = builder.Environment.IsProduction();
 
+// Load configuration from environment variables in production
+if (isProduction)
+{
+    Console.WriteLine("Loading production configuration from environment variables...");
+
+    // Database connection
+    var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+    if (!string.IsNullOrEmpty(databaseUrl))
+    {
+        builder.Configuration["ConnectionStrings:DefaultConnection"] = databaseUrl;
+        Console.WriteLine("Database URL loaded from environment");
+    }
+    else
+    {
+        Console.WriteLine("WARNING: DATABASE_URL environment variable not found");
+    }
+
+    // JWT Settings
+    var jwtToken = Environment.GetEnvironmentVariable("JWT_TOKEN");
+    var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "ClientPortalAPI";
+    var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "ClientPortalUsers";
+
+    if (!string.IsNullOrEmpty(jwtToken))
+    {
+        builder.Configuration["AppSettings:Token"] = jwtToken;
+        Console.WriteLine("JWT Token loaded from environment");
+    }
+    else
+    {
+        Console.WriteLine("WARNING: JWT_TOKEN environment variable not found");
+    }
+
+    builder.Configuration["AppSettings:Issuer"] = jwtIssuer;
+    builder.Configuration["AppSettings:Audience"] = jwtAudience;
+
+    // Email Settings
+    var emailUsername = Environment.GetEnvironmentVariable("EMAIL_USERNAME");
+    var emailPassword = Environment.GetEnvironmentVariable("EMAIL_PASSWORD");
+    var smtpServer = Environment.GetEnvironmentVariable("SMTP_SERVER") ?? "smtp.gmail.com";
+    var smtpPort = Environment.GetEnvironmentVariable("SMTP_PORT") ?? "587";
+    var smtpSsl = Environment.GetEnvironmentVariable("SMTP_ENABLE_SSL") ?? "true";
+    var fromEmail = Environment.GetEnvironmentVariable("FROM_EMAIL") ?? "invoices@billaroo.com";
+    var fromName = Environment.GetEnvironmentVariable("FROM_NAME") ?? "Billaroo Team";
+
+    if (!string.IsNullOrEmpty(emailUsername)) builder.Configuration["EmailSettings:Username"] = emailUsername;
+    if (!string.IsNullOrEmpty(emailPassword)) builder.Configuration["EmailSettings:Password"] = emailPassword;
+
+    builder.Configuration["EmailSettings:SmtpServer"] = smtpServer;
+    builder.Configuration["EmailSettings:Port"] = smtpPort;
+    builder.Configuration["EmailSettings:EnableSsl"] = smtpSsl;
+    builder.Configuration["EmailSettings:FromEmail"] = fromEmail;
+    builder.Configuration["EmailSettings:FromName"] = fromName;
+
+    // SMS Settings
+    var smsProvider = Environment.GetEnvironmentVariable("SMS_PROVIDER") ?? "Twilio";
+    var smsDevelopmentMode = Environment.GetEnvironmentVariable("SMS_DEVELOPMENT_MODE") ?? "false";
+
+    builder.Configuration["SmsSettings:Provider"] = smsProvider;
+    builder.Configuration["SmsSettings:DevelopmentMode"] = smsDevelopmentMode;
+
+    // CORS Settings
+    var allowedProdOrigins = Environment.GetEnvironmentVariable("ALLOWED_ORIGINS");
+    if (!string.IsNullOrEmpty(allowedProdOrigins))
+    {
+        var origins = allowedProdOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                  .Select(o => o.Trim())
+                                  .ToArray();
+
+        // Clear existing origins and set new ones
+        for (int i = 0; i < origins.Length; i++)
+        {
+            builder.Configuration[$"CorsSettings:AllowedOrigins:{i}"] = origins[i];
+        }
+        Console.WriteLine($"CORS origins loaded: {string.Join(", ", origins)}");
+    }
+    else
+    {
+        // Fallback CORS origins for production
+        builder.Configuration["CorsSettings:AllowedOrigins:0"] = "https://yourdomain.com";
+        builder.Configuration["CorsSettings:AllowedOrigins:1"] = "https://www.yourdomain.com";
+        Console.WriteLine("Using fallback CORS origins");
+    }
+}
+
 // Add services to the container.
 builder.Services.AddControllers();
 
@@ -62,6 +146,14 @@ if (isDevelopment)
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+    if (string.IsNullOrEmpty(connectionString))
+    {
+        throw new ArgumentException("Database connection string is not configured. Set DATABASE_URL environment variable or ConnectionStrings:DefaultConnection in configuration.");
+    }
+
+    Console.WriteLine($"Using connection string: {connectionString.Substring(0, Math.Min(50, connectionString.Length))}...");
+
     options.UseNpgsql(connectionString);
 
     // Enable sensitive data logging only in development
@@ -84,7 +176,12 @@ builder.Services.AddScoped<ISecurityAuditService, SecurityAuditService>();
 
 // Configure settings
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
-builder.Services.AddHostedService<SecurityCleanupService>();
+
+// Only add SecurityCleanupService if not in development to avoid the connection issue during startup
+if (!isDevelopment)
+{
+    builder.Services.AddHostedService<SecurityCleanupService>();
+}
 
 // JWT Configuration with environment variables fallback
 var jwtKey = Environment.GetEnvironmentVariable("JWT_TOKEN") ??
@@ -94,6 +191,8 @@ if (string.IsNullOrEmpty(jwtKey))
 {
     throw new ArgumentException("JWT Token key is not configured. Set JWT_TOKEN environment variable or AppSettings:Token in configuration.");
 }
+
+Console.WriteLine($"JWT Key configured (length: {jwtKey.Length})");
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -143,6 +242,8 @@ builder.Services.AddAuthorization(options =>
 var allowedOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>() ??
                     new[] { "http://localhost:5173" };
 
+Console.WriteLine($"CORS origins: {string.Join(", ", allowedOrigins)}");
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -158,6 +259,11 @@ builder.Services.AddCors(options =>
 QuestPDF.Settings.License = LicenseType.Community;
 
 var app = builder.Build();
+
+// Log startup information
+Console.WriteLine($"Environment: {app.Environment.EnvironmentName}");
+Console.WriteLine($"Content Root: {app.Environment.ContentRootPath}");
+Console.WriteLine($"Web Root: {app.Environment.WebRootPath}");
 
 // Configure the HTTP request pipeline based on environment
 if (isDevelopment)
@@ -193,6 +299,7 @@ var uploadsPath = Path.Combine(app.Environment.WebRootPath, "uploads");
 if (!Directory.Exists(uploadsPath))
 {
     Directory.CreateDirectory(uploadsPath);
+    Console.WriteLine($"Created uploads directory: {uploadsPath}");
 }
 
 app.UseStaticFiles(new StaticFileOptions
@@ -209,6 +316,31 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Health check endpoint
-app.MapGet("/health", () => new { Status = "Healthy", Environment = app.Environment.EnvironmentName, Timestamp = DateTime.UtcNow });
+app.MapGet("/health", () => new
+{
+    Status = "Healthy",
+    Environment = app.Environment.EnvironmentName,
+    Timestamp = DateTime.UtcNow,
+    DatabaseConfigured = !string.IsNullOrEmpty(builder.Configuration.GetConnectionString("DefaultConnection")),
+    JwtConfigured = !string.IsNullOrEmpty(jwtKey)
+});
+
+// Test database connection on startup (production only)
+if (isProduction)
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await context.Database.CanConnectAsync();
+        Console.WriteLine("✅ Database connection test successful");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Database connection test failed: {ex.Message}");
+    }
+}
+
+Console.WriteLine("🚀 Application starting...");
 
 app.Run();
