@@ -12,16 +12,16 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Environment detection
+// Detect environment
 var isDevelopment = builder.Environment.IsDevelopment();
 var isProduction = builder.Environment.IsProduction();
 
-// Load configuration from environment variables in production
+// ---------- Environment-specific configuration ----------
 if (isProduction)
 {
     Console.WriteLine("Loading production configuration from environment variables...");
 
-    // Database connection
+    // Database
     var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
     if (!string.IsNullOrEmpty(databaseUrl))
     {
@@ -30,84 +30,56 @@ if (isProduction)
     }
     else
     {
-        Console.WriteLine("WARNING: DATABASE_URL environment variable not found");
+        Console.WriteLine("WARNING: DATABASE_URL not found");
     }
 
-    // JWT Settings
-    var jwtToken = Environment.GetEnvironmentVariable("JWT_TOKEN");
-    var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "ClientPortalAPI";
-    var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "ClientPortalUsers";
+    // JWT
+    builder.Configuration["AppSettings:Token"] = Environment.GetEnvironmentVariable("JWT_TOKEN")
+        ?? builder.Configuration["AppSettings:Token"];
+    builder.Configuration["AppSettings:Issuer"] = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "ClientPortalAPI";
+    builder.Configuration["AppSettings:Audience"] = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "ClientPortalUsers";
 
-    if (!string.IsNullOrEmpty(jwtToken))
-    {
-        builder.Configuration["AppSettings:Token"] = jwtToken;
-        Console.WriteLine("JWT Token loaded from environment");
-    }
-    else
-    {
-        Console.WriteLine("WARNING: JWT_TOKEN environment variable not found");
-    }
-
-    builder.Configuration["AppSettings:Issuer"] = jwtIssuer;
-    builder.Configuration["AppSettings:Audience"] = jwtAudience;
+    // Data Protection
     builder.Services.AddDataProtection()
         .PersistKeysToFileSystem(new DirectoryInfo("/app/keys"))
         .SetApplicationName("ClientPortal")
         .SetDefaultKeyLifetime(TimeSpan.FromDays(90));
 
-    // Email Settings
-    var emailUsername = Environment.GetEnvironmentVariable("EMAIL_USERNAME");
-    var emailPassword = Environment.GetEnvironmentVariable("EMAIL_PASSWORD");
-    var smtpServer = Environment.GetEnvironmentVariable("SMTP_SERVER") ?? "smtp.gmail.com";
-    var smtpPort = Environment.GetEnvironmentVariable("SMTP_PORT") ?? "587";
-    var smtpSsl = Environment.GetEnvironmentVariable("SMTP_ENABLE_SSL") ?? "true";
-    var fromEmail = Environment.GetEnvironmentVariable("FROM_EMAIL") ?? "invoices@billaroo.com";
-    var fromName = Environment.GetEnvironmentVariable("FROM_NAME") ?? "Billaroo Team";
+    // Email
+    builder.Configuration["EmailSettings:Username"] = Environment.GetEnvironmentVariable("EMAIL_USERNAME") ?? builder.Configuration["EmailSettings:Username"];
+    builder.Configuration["EmailSettings:Password"] = Environment.GetEnvironmentVariable("EMAIL_PASSWORD") ?? builder.Configuration["EmailSettings:Password"];
+    builder.Configuration["EmailSettings:SmtpServer"] = Environment.GetEnvironmentVariable("SMTP_SERVER") ?? "smtp.gmail.com";
+    builder.Configuration["EmailSettings:Port"] = Environment.GetEnvironmentVariable("SMTP_PORT") ?? "587";
+    builder.Configuration["EmailSettings:EnableSsl"] = Environment.GetEnvironmentVariable("SMTP_ENABLE_SSL") ?? "true";
+    builder.Configuration["EmailSettings:FromEmail"] = Environment.GetEnvironmentVariable("FROM_EMAIL") ?? "invoices@billaroo.com";
+    builder.Configuration["EmailSettings:FromName"] = Environment.GetEnvironmentVariable("FROM_NAME") ?? "Billaroo Team";
 
-    if (!string.IsNullOrEmpty(emailUsername)) builder.Configuration["EmailSettings:Username"] = emailUsername;
-    if (!string.IsNullOrEmpty(emailPassword)) builder.Configuration["EmailSettings:Password"] = emailPassword;
+    // SMS
+    builder.Configuration["SmsSettings:Provider"] = Environment.GetEnvironmentVariable("SMS_PROVIDER") ?? "Twilio";
+    builder.Configuration["SmsSettings:DevelopmentMode"] = Environment.GetEnvironmentVariable("SMS_DEVELOPMENT_MODE") ?? "false";
 
-    builder.Configuration["EmailSettings:SmtpServer"] = smtpServer;
-    builder.Configuration["EmailSettings:Port"] = smtpPort;
-    builder.Configuration["EmailSettings:EnableSsl"] = smtpSsl;
-    builder.Configuration["EmailSettings:FromEmail"] = fromEmail;
-    builder.Configuration["EmailSettings:FromName"] = fromName;
-
-    // SMS Settings
-    var smsProvider = Environment.GetEnvironmentVariable("SMS_PROVIDER") ?? "Twilio";
-    var smsDevelopmentMode = Environment.GetEnvironmentVariable("SMS_DEVELOPMENT_MODE") ?? "false";
-
-    builder.Configuration["SmsSettings:Provider"] = smsProvider;
-    builder.Configuration["SmsSettings:DevelopmentMode"] = smsDevelopmentMode;
-
-    // CORS Settings
+    // CORS
     var allowedProdOrigins = Environment.GetEnvironmentVariable("ALLOWED_ORIGINS");
     if (!string.IsNullOrEmpty(allowedProdOrigins))
     {
-        var origins = allowedProdOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                                  .Select(o => o.Trim())
-                                  .ToArray();
-
-        // Clear existing origins and set new ones
+        var origins = allowedProdOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(o => o.Trim()).ToArray();
         for (int i = 0; i < origins.Length; i++)
-        {
             builder.Configuration[$"CorsSettings:AllowedOrigins:{i}"] = origins[i];
-        }
+
         Console.WriteLine($"CORS origins loaded: {string.Join(", ", origins)}");
     }
     else
     {
-        // Fallback CORS origins for production
         builder.Configuration["CorsSettings:AllowedOrigins:0"] = "https://yourdomain.com";
         builder.Configuration["CorsSettings:AllowedOrigins:1"] = "https://www.yourdomain.com";
         Console.WriteLine("Using fallback CORS origins");
     }
 }
 
-// Add services to the container.
+// ---------- Services ----------
 builder.Services.AddControllers();
 
-// Configure Swagger/OpenAPI with JWT support (only in development)
+// Swagger (only in development)
 if (isDevelopment)
 {
     builder.Services.AddEndpointsApiExplorer();
@@ -117,13 +89,12 @@ if (isDevelopment)
         {
             Title = "Client Portal API",
             Version = "v1",
-            Description = "A freelancer client portal API with JWT authentication"
+            Description = "Freelancer client portal API with JWT authentication"
         });
 
-        // Configure JWT authentication in Swagger
         c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
-            Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
+            Description = "JWT Authorization header using Bearer scheme",
             Name = "Authorization",
             In = ParameterLocation.Header,
             Type = SecuritySchemeType.ApiKey,
@@ -135,11 +106,7 @@ if (isDevelopment)
             {
                 new OpenApiSecurityScheme
                 {
-                    Reference = new OpenApiReference
-                    {
-                        Type = ReferenceType.SecurityScheme,
-                        Id = "Bearer"
-                    }
+                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
                 },
                 Array.Empty<string>()
             }
@@ -147,21 +114,16 @@ if (isDevelopment)
     });
 }
 
-// Database configuration
+// ---------- Database ----------
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-
-    if (string.IsNullOrEmpty(connectionString))
-    {
-        throw new ArgumentException("Database connection string is not configured. Set DATABASE_URL environment variable or ConnectionStrings:DefaultConnection in configuration.");
-    }
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+                           ?? throw new ArgumentException("Database connection string is not configured.");
 
     Console.WriteLine($"Using connection string: {connectionString.Substring(0, Math.Min(50, connectionString.Length))}...");
 
     options.UseNpgsql(connectionString);
 
-    // Enable sensitive data logging only in development
     if (isDevelopment)
     {
         options.EnableSensitiveDataLogging();
@@ -169,7 +131,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     }
 });
 
-// Register services
+// ---------- Scoped Services ----------
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IFileService, FileService>();
@@ -179,25 +141,17 @@ builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
 builder.Services.AddScoped<ISecurityAuditService, SecurityAuditService>();
 
-// Configure settings
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 
-// Only add SecurityCleanupService if not in development to avoid the connection issue during startup
+// Hosted service only in non-development
 if (!isDevelopment)
 {
     builder.Services.AddHostedService<SecurityCleanupService>();
 }
 
-// JWT Configuration with environment variables fallback
-var jwtKey = Environment.GetEnvironmentVariable("JWT_TOKEN") ??
-             builder.Configuration.GetSection("AppSettings:Token").Value;
-
-if (string.IsNullOrEmpty(jwtKey))
-{
-    throw new ArgumentException("JWT Token key is not configured. Set JWT_TOKEN environment variable or AppSettings:Token in configuration.");
-}
-
-Console.WriteLine($"JWT Key configured (length: {jwtKey.Length})");
+// ---------- JWT Authentication ----------
+var jwtKey = Environment.GetEnvironmentVariable("JWT_TOKEN") ?? builder.Configuration["AppSettings:Token"];
+if (string.IsNullOrEmpty(jwtKey)) throw new ArgumentException("JWT Token key is not configured.");
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -216,26 +170,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             RequireSignedTokens = true
         };
 
-        // Add event handlers for debugging in development only
         if (isDevelopment)
         {
             options.Events = new JwtBearerEvents
             {
-                OnAuthenticationFailed = context =>
-                {
-                    Console.WriteLine($"Authentication failed: {context.Exception.Message}");
-                    return Task.CompletedTask;
-                },
-                OnChallenge = context =>
-                {
-                    Console.WriteLine($"Challenge: {context.Error}, {context.ErrorDescription}");
-                    return Task.CompletedTask;
-                }
+                OnAuthenticationFailed = context => { Console.WriteLine($"Auth failed: {context.Exception.Message}"); return Task.CompletedTask; },
+                OnChallenge = context => { Console.WriteLine($"Challenge: {context.Error}"); return Task.CompletedTask; }
             };
         }
     });
 
-// Add Authorization
+// ---------- Authorization ----------
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("FreelancerOnly", policy => policy.RequireRole("freelancer"));
@@ -243,9 +188,9 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("FreelancerOrClient", policy => policy.RequireRole("freelancer", "client"));
 });
 
-// Add CORS with environment-specific origins
-var allowedOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>() ??
-                    new[] { "http://localhost:5173" };
+// ---------- CORS ----------
+var allowedOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>()
+                     ?? new[] { "http://localhost:5173" };
 
 Console.WriteLine($"CORS origins: {string.Join(", ", allowedOrigins)}");
 
@@ -260,131 +205,27 @@ builder.Services.AddCors(options =>
     });
 });
 
-// QuestPDF License
+// ---------- QuestPDF ----------
 QuestPDF.Settings.License = LicenseType.Community;
 
+// ---------- Build app ----------
 var app = builder.Build();
 
-// Log startup information
+// ---------- Middleware ----------
 Console.WriteLine($"Environment: {app.Environment.EnvironmentName}");
 Console.WriteLine($"Content Root: {app.Environment.ContentRootPath}");
 Console.WriteLine($"Web Root: {app.Environment.WebRootPath}");
 
-// Configure the HTTP request pipeline based on environment
 if (isDevelopment)
 {
     app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Client Portal API v1");
-        c.RoutePrefix = "swagger";
-    });
-
-    app.UseDeveloperExceptionPage();
-    // Skip HTTPS redirection in development
-}
-else
-{
-    app.UseExceptionHandler("/Error");
-    app.UseHsts();
-    app.UseHttpsRedirection();
+    app.UseSwaggerUI();
 }
 
-// CORS should be early in pipeline
-app.UseCors("AllowFrontend");
-
-// Ensure wwwroot exists
-if (string.IsNullOrEmpty(app.Environment.WebRootPath))
-{
-    app.Environment.WebRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-}
-
-// Create uploads directory if it doesn't exist
-var uploadsPath = Path.Combine(app.Environment.WebRootPath, "uploads");
-if (!Directory.Exists(uploadsPath))
-{
-    Directory.CreateDirectory(uploadsPath);
-    Console.WriteLine($"Created uploads directory: {uploadsPath}");
-}
-
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new PhysicalFileProvider(uploadsPath),
-    RequestPath = "/uploads"
-});
-
-// Authentication & Authorization
+app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseCors("AllowFrontend");
 
-// Map controllers
 app.MapControllers();
-
-// Health check endpoint
-app.MapGet("/health", (HttpContext context) =>
-{
-    // Allow health checks over HTTP (for Railway's internal health checker)
-    return Results.Json(new
-    {
-        Status = "Healthy",
-        Environment = app.Environment.EnvironmentName,
-        Timestamp = DateTime.UtcNow,
-        DatabaseConfigured = !string.IsNullOrEmpty(builder.Configuration.GetConnectionString("DefaultConnection")),
-        JwtConfigured = !string.IsNullOrEmpty(jwtKey),
-        RequestScheme = context.Request.Scheme,
-        RequestHost = context.Request.Host.ToString()
-    });
-});
-
-// Test database connection on startup (production only)
-if (isProduction)
-{
-    try
-    {
-        using var scope = app.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await context.Database.CanConnectAsync();
-        Console.WriteLine("✅ Database connection test successful");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"❌ Database connection test failed: {ex.Message}");
-    }
-}
-
-var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-app.Urls.Add($"http://0.0.0.0:{port}");
-
-if (isProduction)
-{
-    app.UseHttpsRedirection();
-
-    // Add HSTS for security
-    app.UseHsts();
-
-    // Add security headers
-    app.Use(async (context, next) =>
-    {
-        context.Response.Headers.Add("X-Frame-Options", "DENY");
-        context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
-        context.Response.Headers.Add("Referrer-Policy", "strict-origin-when-cross-origin");
-        context.Response.Headers.Add("X-XSS-Protection", "1; mode=block");
-
-        await next();
-    });
-}
-
-app.MapGet("/health", () =>
-{
-    return Results.Ok(new
-    {
-        status = "Healthy ✅",
-        timestamp = DateTime.UtcNow
-    });
-});
-
-// (Optional) Root check
-app.MapGet("/", () => Results.Ok("Backend is running 🚀"));
-Console.WriteLine("🚀 Application starting...");
-
 app.Run();
