@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Copy solution and backend project file
 COPY ClientPortal.sln ./
-COPY Server/Server.csproj ./Server/
+COPY server/Server.csproj ./Server/
 
 # Restore dependencies
 RUN dotnet restore ClientPortal.sln
