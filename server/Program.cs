@@ -11,51 +11,68 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Environment detection
+var isDevelopment = builder.Environment.IsDevelopment();
+var isProduction = builder.Environment.IsProduction();
+
 // Add services to the container.
 builder.Services.AddControllers();
 
-// Configure Swagger/OpenAPI with JWT support
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+// Configure Swagger/OpenAPI with JWT support (only in development)
+if (isDevelopment)
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen(c =>
     {
-        Title = "Client Portal API",
-        Version = "v1",
-        Description = "A freelancer client portal API with JWT authentication"
-    });
-
-    // Configure JWT authentication in Swagger
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
-
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
+        c.SwaggerDoc("v1", new OpenApiInfo
         {
-            new OpenApiSecurityScheme
+            Title = "Client Portal API",
+            Version = "v1",
+            Description = "A freelancer client portal API with JWT authentication"
+        });
+
+        // Configure JWT authentication in Swagger
+        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
+            Name = "Authorization",
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.ApiKey,
+            Scheme = "Bearer"
+        });
+
+        c.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
             {
-                Reference = new OpenApiReference
+                new OpenApiSecurityScheme
                 {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer"
+                    }
+                },
+                Array.Empty<string>()
+            }
+        });
     });
-});
+}
 
 // Database configuration
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    options.UseNpgsql(connectionString);
 
-// Register AuthService
+    // Enable sensitive data logging only in development
+    if (isDevelopment)
+    {
+        options.EnableSensitiveDataLogging();
+        options.EnableDetailedErrors();
+    }
+});
+
+// Register services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IFileService, FileService>();
@@ -64,14 +81,18 @@ builder.Services.AddScoped<ISmsService, SmsService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
 builder.Services.AddScoped<ISecurityAuditService, SecurityAuditService>();
+
+// Configure settings
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.AddHostedService<SecurityCleanupService>();
 
-// JWT Configuration
-var jwtKey = builder.Configuration.GetSection("AppSettings:Token").Value;
+// JWT Configuration with environment variables fallback
+var jwtKey = Environment.GetEnvironmentVariable("JWT_TOKEN") ??
+             builder.Configuration.GetSection("AppSettings:Token").Value;
+
 if (string.IsNullOrEmpty(jwtKey))
 {
-    throw new ArgumentException("JWT Token key is not configured in appsettings.json");
+    throw new ArgumentException("JWT Token key is not configured. Set JWT_TOKEN environment variable or AppSettings:Token in configuration.");
 }
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -81,37 +102,33 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-            ValidateIssuer = false, // Changed to false for development
+            ValidateIssuer = !isDevelopment,
             ValidIssuer = builder.Configuration["AppSettings:Issuer"],
-            ValidateAudience = false, // Changed to false for development
+            ValidateAudience = !isDevelopment,
             ValidAudience = builder.Configuration["AppSettings:Audience"],
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromMinutes(5), // Changed from TimeSpan.Zero to allow some clock skew
+            ClockSkew = isDevelopment ? TimeSpan.FromMinutes(5) : TimeSpan.Zero,
             RequireExpirationTime = true,
             RequireSignedTokens = true
         };
 
-        // Add event handlers for debugging
-        options.Events = new JwtBearerEvents
+        // Add event handlers for debugging in development only
+        if (isDevelopment)
         {
-            OnMessageReceived = context =>
+            options.Events = new JwtBearerEvents
             {
-                var token = context.Token;
-                return Task.CompletedTask;
-            },
-            OnAuthenticationFailed = context =>
-            {
-                return Task.CompletedTask;
-            },
-            OnChallenge = context =>
-            {
-                return Task.CompletedTask;
-            },
-            OnTokenValidated = context =>
-            {
-                return Task.CompletedTask;
-            }
-        };
+                OnAuthenticationFailed = context =>
+                {
+                    Console.WriteLine($"Authentication failed: {context.Exception.Message}");
+                    return Task.CompletedTask;
+                },
+                OnChallenge = context =>
+                {
+                    Console.WriteLine($"Challenge: {context.Error}, {context.ErrorDescription}");
+                    return Task.CompletedTask;
+                }
+            };
+        }
     });
 
 // Add Authorization
@@ -122,24 +139,28 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("FreelancerOrClient", policy => policy.RequireRole("freelancer", "client"));
 });
 
-// Add CORS for frontend
+// Add CORS with environment-specific origins
+var allowedOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>() ??
+                    new[] { "http://localhost:5173" };
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowReactApp", policy =>
+    options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "https://localhost:5173")
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
     });
 });
 
+// QuestPDF License
 QuestPDF.Settings.License = LicenseType.Community;
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// Configure the HTTP request pipeline based on environment
+if (isDevelopment)
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
@@ -147,40 +168,47 @@ if (app.Environment.IsDevelopment())
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Client Portal API v1");
         c.RoutePrefix = "swagger";
     });
-}
 
-if (app.Environment.IsDevelopment())
-{
-    // Use CORS early in the pipeline
-    app.UseCors("AllowReactApp");
-
-    // ❌ Skip HTTPS redirection in dev to avoid preflight redirects
-    // app.UseHttpsRedirection();
+    app.UseDeveloperExceptionPage();
+    // Skip HTTPS redirection in development
 }
 else
 {
-    // In production: Keep HTTPS redirection
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
     app.UseHttpsRedirection();
-    app.UseCors("AllowReactApp");
 }
 
+// CORS should be early in pipeline
+app.UseCors("AllowFrontend");
+
+// Ensure wwwroot exists
 if (string.IsNullOrEmpty(app.Environment.WebRootPath))
 {
     app.Environment.WebRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
 }
 
+// Create uploads directory if it doesn't exist
+var uploadsPath = Path.Combine(app.Environment.WebRootPath, "uploads");
+if (!Directory.Exists(uploadsPath))
+{
+    Directory.CreateDirectory(uploadsPath);
+}
+
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(Path.Combine(app.Environment.WebRootPath, "uploads")),
+    FileProvider = new PhysicalFileProvider(uploadsPath),
     RequestPath = "/uploads"
 });
 
-// Add Authentication & Authorization middleware
+// Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapControllers();
 
 // Map controllers
 app.MapControllers();
+
+// Health check endpoint
+app.MapGet("/health", () => new { Status = "Healthy", Environment = app.Environment.EnvironmentName, Timestamp = DateTime.UtcNow });
 
 app.Run();

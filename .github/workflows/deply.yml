@@ -1,0 +1,92 @@
+name: Deploy Application
+
+on:
+  push:
+    branches:
+      - main      # Production deployment
+      - develop   # Staging deployment
+  pull_request:
+    branches:
+      - main
+      - develop
+
+env:
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Run Tests
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+      
+    - name: Run tests
+      run: dotnet test --no-build --configuration Release --verbosity normal
+
+  deploy-staging:
+    if: github.ref == 'refs/heads/develop'
+    needs: test
+    runs-on: ubuntu-latest
+    name: Deploy to Staging
+    environment: staging
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+      
+    - name: Publish
+      run: dotnet publish --no-build --configuration Release --output ./publish
+      
+    # Add your staging deployment steps here
+    # Example for Azure App Service:
+    # - name: Deploy to Azure App Service (Staging)
+    #   uses: azure/webapps-deploy@v2
+    #   with:
+    #     app-name: 'your-staging-app-name'
+    #     publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_STAGING }}
+    #     package: ./publish
+
+  deploy-production:
+    if: github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    name: Deploy to Production
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Install Railway CLI
+      run: npm install -g @railway/cli
+    
+    - name: Deploy to Railway
+      run: railway up --service ${{ secrets.RAILWAY_SERVICE_ID }}
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
