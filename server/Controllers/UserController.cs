@@ -1118,6 +1118,68 @@ namespace Server.Controllers
             return Ok(new { message = "User preferences updated successfully." });
         }
 
+        /// <summary>
+        /// Search for users to start conversations with
+        /// </summary>
+        [HttpGet("search")]
+        public async Task<ActionResult<List<UserSearchResultDto>>> SearchUsers(
+            [FromQuery] string q,
+            [FromQuery] int limit = 10)
+        {
+            try
+            {
+                var currentUserId = GetUserId();
+
+                if (string.IsNullOrWhiteSpace(q))
+                    return BadRequest(new { message = "Search query is required" });
+
+                if (q.Length < 2)
+                    return BadRequest(new { message = "Search query must be at least 2 characters" });
+
+                if (limit > 50) limit = 50; // Prevent abuse
+                if (limit < 1) limit = 10; // Default limit
+
+                var searchTerm = q.Trim().ToLower();
+
+                var users = await _context.Users
+                    .Where(u => u.Id != currentUserId &&
+                               (u.FirstName.ToLower().Contains(searchTerm) ||
+                                u.LastName.ToLower().Contains(searchTerm) ||
+                                u.Username.ToLower().Contains(searchTerm) ||
+                                u.Email.ToLower().Contains(searchTerm) ||
+                                (u.FirstName + " " + u.LastName).ToLower().Contains(searchTerm)))
+                    .OrderBy(u => u.FirstName)
+                    .ThenBy(u => u.LastName)
+                    .Take(limit)
+                    .Select(u => new UserSearchResultDto
+                    {
+                        Id = u.Id,
+                        Username = u.Username,
+                        FirstName = u.FirstName,
+                        LastName = u.LastName,
+                        Email = u.ShowEmail ? u.Email : null, // Respect privacy settings
+                        Role = u.Role,
+                        Company = u.Company,
+                        ProfileImageUrl = u.ProfileImageUrl,
+                        DisplayName = !string.IsNullOrEmpty(u.FirstName) && !string.IsNullOrEmpty(u.LastName)
+                            ? u.FirstName + " " + u.LastName
+                            : u.Username,
+                        IsOnline = u.LastLoginAt.HasValue && u.LastLoginAt.Value > DateTime.UtcNow.AddMinutes(-5)
+                    })
+                    .ToListAsync();
+
+                return Ok(users);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized(new { message = "User not authenticated" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while searching users" });
+            }
+        }
+
         #endregion
     }
 }

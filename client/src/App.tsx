@@ -14,6 +14,7 @@ import Clients from './pages/Clients/Clients';
 import Projects from './pages/Projects/Projects';
 import VerifyEmail from './components/auth/VerifyEmail/VerifyEmail';
 import Invoices from './pages/Invoices/Invoices';
+import Messages from './pages/Messages/Messages';
 
 function App() {
   return (
@@ -68,6 +69,14 @@ function App() {
               element={
                 <PrivateRoute>
                   <Invoices />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/messages" 
+              element={
+                <PrivateRoute>
+                  <Messages />
                 </PrivateRoute>
               } 
             />

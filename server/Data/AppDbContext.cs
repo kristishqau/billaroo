@@ -18,6 +18,10 @@ namespace Server.Data
         public DbSet<LoginHistory> LoginHistories { get; set; }
         public DbSet<SecurityAuditLog> SecurityAuditLogs { get; set; }
         public DbSet<EmailTemplate> EmailTemplates { get; set; }
+        public DbSet<Conversation> Conversations { get; set; }
+        public DbSet<Message> Messages { get; set; }
+        public DbSet<ConversationParticipant> ConversationParticipants { get; set; }
+        public DbSet<MessageReaction> MessageReactions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -281,6 +285,148 @@ namespace Server.Data
             // Global query filter for soft delete
             modelBuilder.Entity<User>()
                 .HasQueryFilter(u => !u.IsDeleted);
+
+            #region Message System Configuration
+
+            // Conversation Configuration
+            modelBuilder.Entity<Conversation>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+
+                entity.Property(c => c.Subject)
+                    .HasMaxLength(200);
+
+                entity.HasIndex(c => new { c.FreelancerId, c.ClientId });
+                entity.HasIndex(c => c.ProjectId);
+                entity.HasIndex(c => c.LastMessageAt);
+                entity.HasIndex(c => c.CreatedAt);
+
+                // Relationships
+                entity.HasOne(c => c.Freelancer)
+                    .WithMany()
+                    .HasForeignKey(c => c.FreelancerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(c => c.Client)
+                    .WithMany()
+                    .HasForeignKey(c => c.ClientId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(c => c.Project)
+                    .WithMany()
+                    .HasForeignKey(c => c.ProjectId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasMany(c => c.Messages)
+                    .WithOne(m => m.Conversation)
+                    .HasForeignKey(m => m.ConversationId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(c => c.Participants)
+                    .WithOne(p => p.Conversation)
+                    .HasForeignKey(p => p.ConversationId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Message Configuration
+            modelBuilder.Entity<Message>(entity =>
+            {
+                entity.HasKey(m => m.Id);
+
+                entity.Property(m => m.Content)
+                    .IsRequired()
+                    .HasMaxLength(5000);
+
+                entity.Property(m => m.AttachmentName)
+                    .HasMaxLength(255);
+
+                entity.Property(m => m.AttachmentMimeType)
+                    .HasMaxLength(100);
+
+                entity.Property(m => m.AttachmentUrl)
+                    .HasMaxLength(500);
+
+                // Indexes for performance
+                entity.HasIndex(m => new { m.ConversationId, m.SentAt });
+                entity.HasIndex(m => m.SenderId);
+                entity.HasIndex(m => new { m.ConversationId, m.IsRead });
+                entity.HasIndex(m => m.ReplyToMessageId);
+
+                // Relationships
+                entity.HasOne(m => m.Conversation)
+                    .WithMany(c => c.Messages)
+                    .HasForeignKey(m => m.ConversationId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(m => m.Sender)
+                    .WithMany()
+                    .HasForeignKey(m => m.SenderId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(m => m.ReplyToMessage)
+                    .WithMany(m => m.Replies)
+                    .HasForeignKey(m => m.ReplyToMessageId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasMany(m => m.Reactions)
+                    .WithOne(r => r.Message)
+                    .HasForeignKey(r => r.MessageId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ConversationParticipant Configuration
+            modelBuilder.Entity<ConversationParticipant>(entity =>
+            {
+                entity.HasKey(p => p.Id);
+
+                // Unique constraint: one participant record per user per conversation
+                entity.HasIndex(p => new { p.ConversationId, p.UserId })
+                    .IsUnique();
+
+                entity.HasIndex(p => p.UserId);
+                entity.HasIndex(p => new { p.UserId, p.LastReadAt });
+
+                // Relationships
+                entity.HasOne(p => p.Conversation)
+                    .WithMany(c => c.Participants)
+                    .HasForeignKey(p => p.ConversationId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(p => p.User)
+                    .WithMany()
+                    .HasForeignKey(p => p.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // MessageReaction Configuration
+            modelBuilder.Entity<MessageReaction>(entity =>
+            {
+                entity.HasKey(r => r.Id);
+
+                entity.Property(r => r.Emoji)
+                    .IsRequired()
+                    .HasMaxLength(10);
+
+                // Unique constraint: one reaction per user per message per emoji
+                entity.HasIndex(r => new { r.MessageId, r.UserId, r.Emoji })
+                    .IsUnique();
+
+                entity.HasIndex(r => r.MessageId);
+                entity.HasIndex(r => r.UserId);
+
+                // Relationships
+                entity.HasOne(r => r.Message)
+                    .WithMany(m => m.Reactions)
+                    .HasForeignKey(r => r.MessageId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(r => r.User)
+                    .WithMany()
+                    .HasForeignKey(r => r.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            #endregion
 
             base.OnModelCreating(modelBuilder);
         }
