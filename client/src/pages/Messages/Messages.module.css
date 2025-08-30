@@ -3,14 +3,58 @@
    ========================================================================== */
 
 /* ==========================================================================
-   CUSTOM SCROLLBARS (HIDDEN)
+   CUSTOM SCROLLBARS
    ========================================================================== */
 
-/* Hide scrollbars for webkit browsers */
-.messagesArea::-webkit-scrollbar,
+/* Custom scrollbar for messages area */
+.messagesArea::-webkit-scrollbar {
+  width: 4px;
+}
+
+.messagesArea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.messagesArea::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 2px;
+  transition: background 0.2s ease;
+}
+
+.messagesArea::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* Firefox scrollbar styling */
+.messagesArea {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
+/* Hide scrollbars for conversations list and textarea (keep these hidden) */
 .conversationsList::-webkit-scrollbar,
 .messageTextarea::-webkit-scrollbar {
   display: none;
+}
+
+/* Custom scrollbar for conversations list (alternative if you want to show it) */
+.conversationsList::-webkit-scrollbar {
+  width: 4px;
+  display: none; /* Keep hidden for now, remove this line if you want to show it */
+}
+
+.conversationsList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.conversationsList::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 2px;
+  transition: background 0.2s ease;
+}
+
+.conversationsList::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
 }
 
 /* ==========================================================================
