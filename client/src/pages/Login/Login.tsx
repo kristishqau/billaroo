@@ -3,7 +3,7 @@ import { useNavigate, Link, useLocation } from "react-router-dom"
 import styles from "./Login.module.css"
 import { useAuth } from "../../context/AuthContext"
 import axios from "../../api/axios"
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react'
 
 type LoginForm = {
   username: string
@@ -60,44 +60,41 @@ export default function Login() {
         username: form.username,
         password: form.password
       })
+
       const user = response.data
-      
-      // Handle remember me functionality
+
       if (form.rememberMe) {
         localStorage.setItem("rememberUser", form.username)
       } else {
         localStorage.removeItem("rememberUser")
       }
-      
+
       login(user)
-      
-      // Show welcome back message if user has logged in before
+
       if (user.lastLoginAt) {
         setSuccessMessage(`Welcome back, ${user.username}!`)
         setTimeout(() => {
           navigateBasedOnRole(user.role)
         }, 1000)
       } else {
-        // First time login
         setSuccessMessage(`Welcome to Billaroo, ${user.username}!`)
         setTimeout(() => {
           navigateBasedOnRole(user.role)
         }, 1500)
       }
-      
     } catch (err: any) {
-      console.error('Login error:', err)
-      
+      console.error("Login error:", err)
+
       let errorMessage = "Login failed. Please try again."
-      
+
       if (err.response?.status === 400) {
         const responseData = err.response.data
-        
-        if (typeof responseData === 'string') {
+        if (typeof responseData === "string") {
           errorMessage = responseData
-          
-          // Check if account is locked
-          if (responseData.includes('locked') || responseData.includes('Lock')) {
+          if (
+            responseData.includes("locked") ||
+            responseData.includes("Lock")
+          ) {
             setAccountLocked(true)
           }
         }
@@ -107,12 +104,15 @@ export default function Login() {
       } else if (err.response?.status === 500) {
         errorMessage = "Server error. Please try again later."
       } else if (err.response?.data) {
-        errorMessage = typeof err.response.data === 'string' 
-          ? err.response.data 
-          : err.response.data.message || errorMessage
+        errorMessage =
+          typeof err.response.data === "string"
+            ? err.response.data
+            : err.response.data.message || errorMessage
       }
-      
+
       setError(errorMessage)
+    } finally {
+      setLoading(false)
     }
   }
 
