@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef } from "react";
 import styles from "../../pages/Messages/Messages.module.css";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
@@ -29,7 +29,6 @@ export default function ChatArea({
   conversation,
   messages,
   onSendMessage,
-  onLoadMoreMessages,
   sendingMessage,
   loadingMessages,
   hasMoreMessages,
@@ -39,23 +38,12 @@ export default function ChatArea({
   onShowSidebar
 }: ChatAreaProps) {
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [lastScrollHeight, setLastScrollHeight] = useState(0);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
 
   const otherParticipant = user?.role === 'freelancer' 
     ? conversation.client 
     : conversation.freelancer;
 
-  // Preserve scroll position when loading more messages
-  useEffect(() => {
-    if (messagesAreaRef.current && lastScrollHeight > 0) {
-      const newScrollHeight = messagesAreaRef.current.scrollHeight;
-      const heightDifference = newScrollHeight - lastScrollHeight;
-      messagesAreaRef.current.scrollTop += heightDifference;
-      setLastScrollHeight(0);
-    }
-  }, [messages, lastScrollHeight]);
 
   const getInitials = (user: UserSummary) => {
     if (user.firstName && user.lastName) {
@@ -109,50 +97,6 @@ export default function ChatArea({
   const handleCancelReply = () => {
     setReplyingTo(null);
   };
-
-  // Optimized scroll handler with debouncing and better logic
-  const handleScroll = useCallback(() => {
-    if (!messagesAreaRef.current || loadingMessages || isLoadingMore || !hasMoreMessages) {
-      return;
-    }
-    
-    const { scrollTop, scrollHeight, clientHeight } = messagesAreaRef.current;
-    
-    // Load more messages when scrolled near the top (within 200px)
-    // Also ensure we're not at the very beginning (scrollTop > 0)
-    if (scrollTop < 200 && scrollTop > 0) {
-      setIsLoadingMore(true);
-      setLastScrollHeight(scrollHeight);
-      
-      onLoadMoreMessages()
-        .finally(() => {
-          setIsLoadingMore(false);
-        });
-    }
-  }, [loadingMessages, isLoadingMore, hasMoreMessages, onLoadMoreMessages]);
-
-  // Debounced scroll handler to prevent excessive calls
-  const debouncedHandleScroll = useCallback(() => {
-    const timeoutId = setTimeout(handleScroll, 100);
-    return () => clearTimeout(timeoutId);
-  }, [handleScroll]);
-
-  // Scroll to bottom when new messages arrive (but not when loading more)
-  useEffect(() => {
-    if (!isLoadingMore && messagesEndRef.current) {
-      const shouldAutoScroll = () => {
-        if (!messagesAreaRef.current) return true;
-        
-        const { scrollTop, scrollHeight, clientHeight } = messagesAreaRef.current;
-        const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-        return isNearBottom;
-      };
-
-      if (shouldAutoScroll()) {
-        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-      }
-    }
-  }, [messages.length, isLoadingMore]);
 
   return (
     <>
@@ -217,10 +161,9 @@ export default function ChatArea({
       <div 
         className={styles.messagesArea}
         ref={messagesAreaRef}
-        onScroll={debouncedHandleScroll}
       >
         {/* Load More Messages Indicator */}
-        {(loadingMessages || isLoadingMore) && hasMoreMessages && (
+        {loadingMessages && hasMoreMessages && (
           <div className={styles.messagesLoading} style={{
             padding: '1rem',
             textAlign: 'center',

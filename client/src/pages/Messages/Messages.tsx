@@ -154,10 +154,6 @@ export default function Messages() {
     }
   }, [selectedConversation]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
   const fetchConversations = async () => {
     try {
       setLoading(true);
@@ -368,10 +364,6 @@ export default function Messages() {
     await fetchMessages(selectedConversation.id, page + 1, false);
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   const filteredConversations = conversations.filter(conv => {
     // Apply filter
     if (filter === 'unread' && conv.unreadCount === 0) return false;
@@ -513,7 +505,7 @@ export default function Messages() {
             onClick={() => setSidebarOpen(true)}
             style={{
               position: 'fixed',
-              top: '90px', // Changed from 80px to 90px to avoid navbar
+              top: '90px',
               left: '1rem',
               zIndex: 5,
               display: 'none' // Will be shown via CSS media queries
