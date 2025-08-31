@@ -121,7 +121,7 @@ export default function Login() {
     if (role === 'freelancer') {
       navigate(from)
     } else {
-      navigate('/client-dashboard') // Different dashboard for clients
+      navigate('/dashboard') // Different dashboard for clients
     }
   }
 
