@@ -4,6 +4,7 @@ import Navbar from '../../components/Navbar/Navbar'
 import { RefreshCw, XCircle, User, Shield, Settings, FileText, Award } from 'lucide-react'
 import Notification from '../../components/Notification/Notification'
 import { useNotification } from '../../hooks/useNotification'
+import { useAuth } from '../../context/AuthContext'
 
 // Hook imports
 import { useProfileData } from '../../hooks/useProfileData'
@@ -35,8 +36,12 @@ import IdentityVerificationModal from '../../components/Profile/IdentityVerifica
 type TabType = 'profile' | 'security' | 'preferences' | 'professional' | 'documents'
 
 export default function Profile() {
+  const { user } = useAuth() // Get the current user to check role
   const showNotification = useNotification()
   const [activeTab, setActiveTab] = useState<TabType>('profile')
+
+  // Check if user is client
+  const isClient = user?.role === 'client'
 
   // Core profile data
   const {
@@ -64,11 +69,11 @@ export default function Profile() {
   // File upload hook
   const fileUpload = useFileUpload()
 
-  // Skills management hook
+  // Skills management hook (only for freelancers)
   const skillsManagement = useSkillsManagement(profile?.skills || [])
 
   // Privacy and preferences hook
-  const privacyAndPreferences = usePrivacyAndPreferences(profile)
+  const privacyAndPreferences = usePrivacyAndPreferences(profile) // Pass refetchProfile
 
   // Account management hook
   const accountManagement = useAccountManagement()
@@ -80,10 +85,12 @@ export default function Profile() {
   useEffect(() => {
     if (profile) {
       profileForms.initializeFormData(profile)
-      skillsManagement.updateSkills(profile.skills || [])
+      if (!isClient) {
+        skillsManagement.updateSkills(profile.skills || [])
+      }
       privacyAndPreferences.initializeSettings(profile)
     }
-  }, [profile])
+  }, [profile, isClient])
 
   /**
    * Formats a date string into a more readable format.
@@ -101,8 +108,10 @@ export default function Profile() {
     })
   }
 
-  // Handle CV upload
+  // Handle CV upload (only for freelancers)
   const handleCvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isClient) return // Prevent clients from uploading CV
+    
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -110,13 +119,31 @@ export default function Profile() {
     e.target.value = ''
   }
 
-  const tabs = [
-    { id: 'profile' as TabType, label: 'Profile', icon: User },
-    { id: 'professional' as TabType, label: 'Professional', icon: Award },
-    { id: 'security' as TabType, label: 'Security', icon: Shield },
-    { id: 'preferences' as TabType, label: 'Preferences', icon: Settings },
-    { id: 'documents' as TabType, label: 'Documents', icon: FileText },
-  ]
+  // Define tabs based on user role
+  const getTabsForRole = () => {
+    const baseTabs = [
+      { id: 'profile' as TabType, label: 'Profile', icon: User },
+      { id: 'security' as TabType, label: 'Security', icon: Shield },
+      { id: 'preferences' as TabType, label: 'Preferences', icon: Settings },
+    ]
+
+    // Only add professional and documents tabs for freelancers
+    if (!isClient) {
+      baseTabs.splice(1, 0, { id: 'professional' as TabType, label: 'Professional', icon: Award })
+      baseTabs.push({ id: 'documents' as TabType, label: 'Documents', icon: FileText })
+    }
+
+    return baseTabs
+  }
+
+  const tabs = getTabsForRole()
+
+  // Adjust active tab if client tries to access restricted tabs
+  useEffect(() => {
+    if (isClient && (activeTab === 'professional' || activeTab === 'documents')) {
+      setActiveTab('profile')
+    }
+  }, [isClient, activeTab])
 
   // Display loading state
   if (loading) {
@@ -162,6 +189,12 @@ export default function Profile() {
           onImageUpload={(e) => fileUpload.handleProfileImageUpload(e.target.files?.[0]!, refetchProfile)}
           uploading={fileUpload.uploadingProfileImage}
           notification={fileUpload.profileImageNotification}
+          isClient={isClient}
+          privacySettings={{
+            showEmail: privacyAndPreferences.showEmail,
+            showPhone: privacyAndPreferences.showPhone,
+            showAddress: privacyAndPreferences.showAddress
+          }}
         />
 
         {/* Tab Navigation */}
@@ -243,7 +276,7 @@ export default function Profile() {
             </div>
           )}
 
-          {activeTab === 'professional' && (
+          {activeTab === 'professional' && !isClient && (
             <div className={styles.tabPanel}>
               <ProfessionalInfoSection
                 profile={profile}
@@ -260,6 +293,7 @@ export default function Profile() {
                 updateField={profileForms.updateField}
                 onSubmit={profileForms.handleProfessionalInfoUpdate}
                 notification={profileForms.professionalNotification}
+                isClient={isClient}
               />
 
               <SkillsSection
@@ -354,7 +388,7 @@ export default function Profile() {
             </div>
           )}
 
-          {activeTab === 'documents' && (
+          {activeTab === 'documents' && !isClient && (
             <div className={styles.tabPanel}>
               <CVSection
                 profile={profile}

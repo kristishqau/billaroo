@@ -20,6 +20,7 @@ interface ProfessionalInfoSectionProps {
   updateField: (field: 'jobTitle' | 'company' | 'website' | 'linkedInUrl' | 'gitHubUrl' | 'portfolioUrl', value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   notification: UseNotificationReturn;
+  isClient?: boolean;
 }
 
 const ProfessionalInfoSection: React.FC<ProfessionalInfoSectionProps> = ({
@@ -29,7 +30,8 @@ const ProfessionalInfoSection: React.FC<ProfessionalInfoSectionProps> = ({
   formData,
   updateField,
   onSubmit,
-  notification
+  notification,
+  isClient = false
 }) => {
   return (
     <section className={styles.sectionContainer}>
@@ -61,16 +63,19 @@ const ProfessionalInfoSection: React.FC<ProfessionalInfoSectionProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--spacing-lg)' }}>
-            <div className={styles.formGroup}>
-              <label className={styles.formLabel}>GitHub</label>
-              <input type="url" className={styles.formInput} value={profile?.gitHubUrl || 'Not set'} disabled />
+          {/* Hide GitHub and Portfolio for clients */}
+          {!isClient && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--spacing-lg)' }}>
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>GitHub</label>
+                <input type="url" className={styles.formInput} value={profile?.gitHubUrl || 'Not set'} disabled />
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>Portfolio</label>
+                <input type="url" className={styles.formInput} value={profile?.portfolioUrl || 'Not set'} disabled />
+              </div>
             </div>
-            <div className={styles.formGroup}>
-              <label className={styles.formLabel}>Portfolio</label>
-              <input type="url" className={styles.formInput} value={profile?.portfolioUrl || 'Not set'} disabled />
-            </div>
-          </div>
+          )}
 
           <button onClick={() => setIsEditing(true)} className={styles.formButton}>
             <Edit size={16} /> Edit Professional Info
@@ -87,7 +92,7 @@ const ProfessionalInfoSection: React.FC<ProfessionalInfoSectionProps> = ({
                 className={styles.formInput}
                 value={formData.jobTitle}
                 onChange={(e) => updateField('jobTitle', e.target.value)}
-                placeholder="e.g. Full Stack Developer"
+                placeholder={isClient ? "e.g. Project Manager, CEO, Business Owner" : "e.g. Full Stack Developer"}
               />
             </div>
             <div className={styles.formGroup}>
@@ -136,38 +141,41 @@ const ProfessionalInfoSection: React.FC<ProfessionalInfoSectionProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--spacing-lg)' }}>
-            <div className={styles.formGroup}>
-              <label htmlFor="gitHubUrl" className={styles.formLabel}>GitHub Profile</label>
-              <div style={{ position: 'relative' }}>
-                <LinkIcon size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input
-                  id="gitHubUrl"
-                  type="url"
-                  className={styles.formInput}
-                  style={{ paddingLeft: '40px' }}
-                  value={formData.gitHubUrl}
-                  onChange={(e) => updateField('gitHubUrl', e.target.value)}
-                  placeholder="https://github.com/yourusername"
-                />
+          {/* Hide GitHub and Portfolio fields for clients */}
+          {!isClient && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--spacing-lg)' }}>
+              <div className={styles.formGroup}>
+                <label htmlFor="gitHubUrl" className={styles.formLabel}>GitHub Profile</label>
+                <div style={{ position: 'relative' }}>
+                  <LinkIcon size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    id="gitHubUrl"
+                    type="url"
+                    className={styles.formInput}
+                    style={{ paddingLeft: '40px' }}
+                    value={formData.gitHubUrl}
+                    onChange={(e) => updateField('gitHubUrl', e.target.value)}
+                    placeholder="https://github.com/yourusername"
+                  />
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="portfolioUrl" className={styles.formLabel}>Portfolio</label>
+                <div style={{ position: 'relative' }}>
+                  <LinkIcon size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    id="portfolioUrl"
+                    type="url"
+                    className={styles.formInput}
+                    style={{ paddingLeft: '40px' }}
+                    value={formData.portfolioUrl}
+                    onChange={(e) => updateField('portfolioUrl', e.target.value)}
+                    placeholder="https://yourportfolio.com"
+                  />
+                </div>
               </div>
             </div>
-            <div className={styles.formGroup}>
-              <label htmlFor="portfolioUrl" className={styles.formLabel}>Portfolio</label>
-              <div style={{ position: 'relative' }}>
-                <LinkIcon size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input
-                  id="portfolioUrl"
-                  type="url"
-                  className={styles.formInput}
-                  style={{ paddingLeft: '40px' }}
-                  value={formData.portfolioUrl}
-                  onChange={(e) => updateField('portfolioUrl', e.target.value)}
-                  placeholder="https://yourportfolio.com"
-                />
-              </div>
-            </div>
-          </div>
+          )}
 
           <div style={{ display: 'flex', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-lg)' }}>
             <button type="submit" className={styles.formButton}>

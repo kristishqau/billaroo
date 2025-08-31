@@ -75,7 +75,22 @@ export type UserProfile = {
   createdAt: string;
   lastLoginAt?: string;
   skills?: UserSkill[];
+  privacySettings?: PrivacySettings;
+  notificationPreferences?: NotificationPreferences;
 };
+
+export interface PrivacySettings {
+  showEmail: boolean;
+  showPhone: boolean;
+  showAddress: boolean;
+  allowMessages: boolean;
+}
+
+export interface NotificationPreferences {
+  emailNotifications: boolean;
+  smsNotifications: boolean;
+  marketingEmails: boolean;
+}
 
 export type AccountStatus = {
   isActive: boolean;

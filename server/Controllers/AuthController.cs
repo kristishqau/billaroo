@@ -355,7 +355,7 @@ namespace Server.Controllers
         }
 
         [HttpPost("reset-password")]
-        public async Task<ActionResult> ResetPassword(ResetPasswordDto request)
+        public async Task<ActionResult> ResetPassword([FromBody] ResetPasswordDto request)
         {
             try
             {
@@ -367,10 +367,8 @@ namespace Server.Controllers
                     return BadRequest("Invalid or expired reset token");
                 }
 
-                // Create new password hash
                 _authService.CreatePasswordHash(request.NewPassword, out byte[] passwordHash, out byte[] passwordSalt);
 
-                // Update user
                 user.PasswordHash = passwordHash;
                 user.PasswordSalt = passwordSalt;
                 user.PasswordResetToken = null;

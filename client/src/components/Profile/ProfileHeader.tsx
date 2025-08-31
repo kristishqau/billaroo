@@ -11,6 +11,12 @@ interface ProfileHeaderProps {
   onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   uploading: boolean;
   notification: UseNotificationReturn;
+  isClient?: boolean;
+  privacySettings?: {
+    showEmail: boolean;
+    showPhone: boolean;
+    showAddress: boolean;
+  };
 }
 
 const ProfileHeader: React.FC<ProfileHeaderProps> = ({
@@ -18,7 +24,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   profileCompletion,
   onImageUpload,
   uploading,
-  notification
+  notification,
+  isClient = false,
+  privacySettings = { showEmail: true, showPhone: true, showAddress: true }
 }) => {
   // Hook to track window width for responsiveness
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
@@ -229,7 +237,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             </h1>
             <div style={{ gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
               <p className={styles.profileRole}>{profile?.role}</p>
-              {profile?.company && (
+              {profile?.company && !isClient && (
                 <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                   @ {profile.company}
                 </span>
@@ -237,14 +245,15 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             </div>
           </div>
 
-          {/* Quick Info Grid */}
+          {/* Quick Info Grid - Apply privacy settings */}
           <div className="profile-info-grid" style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
             gap: 'var(--spacing-sm)', 
             marginBottom: 'var(--spacing-lg)'
           }}>
-            {profile?.email && (
+            {/* Email - Show only if privacy settings allow */}
+            {profile?.email && privacySettings.showEmail && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
                 <Mail size={16} style={{ color: 'var(--text-muted)' }} />
                 <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
@@ -258,7 +267,8 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               </div>
             )}
             
-            {profile?.phoneNumber && (
+            {/* Phone - Show only if privacy settings allow */}
+            {profile?.phoneNumber && privacySettings.showPhone && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
                 <Phone size={16} style={{ color: 'var(--text-muted)' }} />
                 <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
@@ -272,7 +282,8 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               </div>
             )}
             
-            {(profile?.city || profile?.country) && (
+            {/* Address - Show only if privacy settings allow */}
+            {(profile?.city || profile?.country) && privacySettings.showAddress && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
                 <MapPin size={16} style={{ color: 'var(--text-muted)' }} />
                 <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
@@ -281,6 +292,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               </div>
             )}
             
+            {/* Member Since - Always show */}
             {profile?.createdAt && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
                 <Calendar size={16} style={{ color: 'var(--text-muted)' }} />
@@ -315,8 +327,8 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           )}
         </div>
 
-        {/* Profile Completion Section - Only show on desktop */}
-        {windowWidth > 1024 && (
+        {/* Profile Completion Section - Only show for freelancers on desktop */}
+        {windowWidth > 1024 && !isClient && (
           <div className="profile-completion-container" style={{ minWidth: '250px' }}>
             {profileCompletion && (
               <div style={{
@@ -438,8 +450,8 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </div>
         )}
 
-        {/* Mobile/Tablet Completion Section */}
-        <MobileCompletionSection />
+        {/* Mobile/Tablet Completion Section - Only show for freelancers */}
+        {!isClient && <MobileCompletionSection />}
       </div>
 
       <Notification 
