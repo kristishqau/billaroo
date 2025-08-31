@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import styles from "../../pages/Messages/Messages.module.css";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
@@ -29,6 +29,7 @@ export default function ChatArea({
   conversation,
   messages,
   onSendMessage,
+  onLoadMoreMessages,
   sendingMessage,
   loadingMessages,
   hasMoreMessages,
@@ -40,10 +41,25 @@ export default function ChatArea({
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
 
+  // Clear reply state when conversation changes
+  useEffect(() => {
+    setReplyingTo(null);
+  }, [conversation.id]);
+
+  // Auto-scroll to bottom for new messages (but not when loading more)
+  useEffect(() => {
+    if (!loadingMessages && messages.length > 0 && messagesEndRef.current) {
+      const timer = setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [messages.length, loadingMessages]);
+
   const otherParticipant = user?.role === 'freelancer' 
     ? conversation.client 
     : conversation.freelancer;
-
 
   const getInitials = (user: UserSummary) => {
     if (user.firstName && user.lastName) {
@@ -96,6 +112,16 @@ export default function ChatArea({
 
   const handleCancelReply = () => {
     setReplyingTo(null);
+  };
+
+  // Handle infinite scroll for loading more messages
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop } = e.currentTarget;
+    
+    // Load more messages when scrolled to top
+    if (scrollTop === 0 && hasMoreMessages && !loadingMessages) {
+      onLoadMoreMessages();
+    }
   };
 
   return (
@@ -161,10 +187,11 @@ export default function ChatArea({
       <div 
         className={styles.messagesArea}
         ref={messagesAreaRef}
+        onScroll={handleScroll}
       >
-        {/* Load More Messages Indicator */}
-        {loadingMessages && hasMoreMessages && (
-          <div className={styles.messagesLoading} style={{
+        {/* Loading indicator for more messages */}
+        {loadingMessages && hasMoreMessages && messages.length > 0 && (
+          <div style={{
             padding: '1rem',
             textAlign: 'center',
             borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
@@ -184,8 +211,8 @@ export default function ChatArea({
           </div>
         )}
 
-        {/* No More Messages Indicator */}
-        {!hasMoreMessages && messages.length > 0 && (
+        {/* No more messages indicator */}
+        {!hasMoreMessages && messages.length > 0 && !loadingMessages && (
           <div style={{
             textAlign: 'center',
             padding: '1rem',
@@ -198,12 +225,31 @@ export default function ChatArea({
           </div>
         )}
 
-        <MessageList
-          messages={messages}
-          currentUserId={user?.id}
-          onReply={handleReply}
-          conversation={conversation}
-        />
+        {/* Main loading state */}
+        {loadingMessages && messages.length === 0 ? (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '200px',
+            color: '#94a3b8'
+          }}>
+            <div className={styles.spinner} style={{ 
+              width: '32px', 
+              height: '32px', 
+              margin: '0 auto 1rem' 
+            }}></div>
+            <span>Loading messages...</span>
+          </div>
+        ) : (
+          <MessageList
+            messages={messages}
+            currentUserId={user?.id}
+            onReply={handleReply}
+            conversation={conversation}
+          />
+        )}
         
         <div ref={messagesEndRef} />
       </div>

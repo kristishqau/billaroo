@@ -148,12 +148,6 @@ export default function Messages() {
     }
   }, [user]);
 
-  useEffect(() => {
-    if (selectedConversation) {
-      fetchMessages(selectedConversation.id, 1, true);
-    }
-  }, [selectedConversation]);
-
   const fetchConversations = async () => {
     try {
       setLoading(true);
@@ -384,8 +378,13 @@ export default function Messages() {
     return true;
   });
 
-  const handleConversationSelect = (conversation: ConversationSummary) => {
-    // Find the full conversation or create a minimal one
+  const handleConversationSelect = async (conversation: ConversationSummary) => {
+    // Don't reload if it's the same conversation
+    if (selectedConversation?.id === conversation.id) {
+      setSidebarOpen(false);
+      return;
+    }
+
     const fullConversation: Conversation = {
       id: conversation.id,
       freelancerId: user?.role === 'freelancer' ? user.id : conversation.otherParticipant.id,
@@ -422,8 +421,12 @@ export default function Messages() {
       unreadCount: conversation.unreadCount
     };
 
+    // Set conversation first, then fetch messages
     setSelectedConversation(fullConversation);
     setSidebarOpen(false); // Close sidebar on mobile
+    
+    // Fetch messages for this conversation
+    await fetchMessages(conversation.id, 1, true);
   };
 
   if (loading) {
