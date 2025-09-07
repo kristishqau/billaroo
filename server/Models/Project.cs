@@ -14,6 +14,6 @@ namespace Server.Models
         public DateTime Deadline { get; set; }
 
         public int ClientId { get; set; }
-        public Client? Client { get; set; }
+        public User? Client { get; set; }
     }
 }

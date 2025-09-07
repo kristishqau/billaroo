@@ -39,7 +39,7 @@ namespace Server.Controllers
                 // Verify project belongs to freelancer
                 var project = await _context.Projects
                     .Include(p => p.Client)
-                    .FirstOrDefaultAsync(p => p.Id == dto.ProjectId && p.Client!.FreelancerId == userId);
+                    .FirstOrDefaultAsync(p => p.Id == dto.ProjectId && p.Client!.Role == "client");
 
                 if (project == null)
                     return BadRequest("Project not found or not yours.");
@@ -127,7 +127,7 @@ namespace Server.Controllers
                 {
                     var project = await _context.Projects
                         .Include(p => p.Client)
-                        .FirstOrDefaultAsync(p => p.Id == dto.ProjectId && p.Client!.FreelancerId == userId);
+                        .FirstOrDefaultAsync(p => p.Id == dto.ProjectId && p.Client!.Role == "client");
 
                     if (project == null)
                         return BadRequest("Project not found or not yours.");
@@ -362,7 +362,7 @@ namespace Server.Controllers
                 ProjectId = invoice.ProjectId,
                 ProjectTitle = invoice.Project?.Title ?? "N/A",
                 ClientId = invoice.ClientId,
-                ClientName = invoice.Client?.Name ?? "N/A",
+                ClientName = invoice.Client?.Username ?? "N/A",
                 CreatedAt = invoice.CreatedAt,
                 SentAt = invoice.SentAt,
                 PaidAt = invoice.PaidAt,
@@ -373,7 +373,7 @@ namespace Server.Controllers
                     Quantity = item.Quantity,
                     Rate = item.Rate,
                     Total = item.Total
-                }).ToList() ?? new List<InvoiceItemDto>(),
+                }).ToList() ?? [],
                 Payments = invoice.Payments?.Select(payment => new PaymentDto
                 {
                     Id = payment.Id,
@@ -384,7 +384,7 @@ namespace Server.Controllers
                     TransactionId = payment.TransactionId,
                     Notes = payment.Notes,
                     CreatedAt = payment.CreatedAt
-                }).ToList() ?? new List<PaymentDto>()
+                }).ToList() ?? []
             };
         }
     }

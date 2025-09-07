@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Server.Data;
@@ -33,7 +33,7 @@ namespace Server.Controllers
             // Verify user has access to the project
             var hasAccess = userRole == "freelancer"
                 ? await _context.Projects.Include(p => p.Client)
-                    .AnyAsync(p => p.Id == dto.ProjectId && p.Client!.FreelancerId == userId)
+                    .AnyAsync(p => p.Id == dto.ProjectId && p.Client!.Role == "client")
                 : await _context.Projects
                     .AnyAsync(p => p.Id == dto.ProjectId && p.ClientId == userId);
 
@@ -97,7 +97,7 @@ namespace Server.Controllers
             // Verify user has access to the project
             var hasAccess = userRole == "freelancer"
                 ? await _context.Projects.Include(p => p.Client)
-                    .AnyAsync(p => p.Id == projectId && p.Client!.FreelancerId == userId)
+                    .AnyAsync(p => p.Id == projectId && p.Client!.Role == "client")
                 : await _context.Projects
                     .AnyAsync(p => p.Id == projectId && p.ClientId == userId);
 
@@ -146,7 +146,7 @@ namespace Server.Controllers
 
             // Check access based on user role
             var hasAccess = userRole == "freelancer"
-                ? file.Project!.Client!.FreelancerId == userId
+                ? file.Project!.Client!.Role == "client"
                 : file.Project!.ClientId == userId;
 
             if (!hasAccess)
@@ -183,7 +183,7 @@ namespace Server.Controllers
 
             // Check access - only the uploader or project owner (freelancer) can delete
             var canDelete = file.UploadedById == userId ||
-                           (userRole == "freelancer" && file.Project!.Client!.FreelancerId == userId);
+                           (userRole == "freelancer" && file.Project!.Client!.Role == "client");
 
             if (!canDelete)
                 return Forbid();
@@ -218,7 +218,7 @@ namespace Server.Controllers
             // Filter based on user role
             if (userRole == "freelancer")
             {
-                query = query.Where(pf => pf.Project!.Client!.FreelancerId == userId);
+                query = query.Where(pf => pf.Project!.Client!.Role == "client");
             }
             else
             {
@@ -260,7 +260,7 @@ namespace Server.Controllers
             // Filter based on user role
             if (userRole == "freelancer")
             {
-                query = query.Where(pf => pf.Project!.Client!.FreelancerId == userId);
+                query = query.Where(pf => pf.Project!.Client!.Role == "client");
             }
             else
             {

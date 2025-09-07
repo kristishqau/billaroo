@@ -3,12 +3,9 @@ using Server.Models;
 
 namespace Server.Data
 {
-    public class AppDbContext : DbContext
+    public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
     {
-        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
-
         public DbSet<User> Users { get; set; }
-        public DbSet<Client> Clients { get; set; }
         public DbSet<Project> Projects { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
         public DbSet<InvoiceItem> InvoiceItems { get; set; }
@@ -43,17 +40,12 @@ namespace Server.Data
                 .HasPrecision(18, 2);
 
             // Configure relationships
-            modelBuilder.Entity<Client>()
-                .HasOne(c => c.Freelancer)
-                .WithMany()
-                .HasForeignKey(c => c.FreelancerId)
-                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Project>()
                 .HasOne(p => p.Client)
                 .WithMany()
                 .HasForeignKey(p => p.ClientId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Project>()
                 .HasIndex(p => p.Deadline);
@@ -69,9 +61,6 @@ namespace Server.Data
                 .WithMany()
                 .HasForeignKey(i => i.ClientId)
                 .OnDelete(DeleteBehavior.Restrict);
-
-            modelBuilder.Entity<Client>()
-                .HasIndex(c => c.Email);
 
             modelBuilder.Entity<Invoice>()
                 .HasOne(i => i.Freelancer)
