@@ -4,13 +4,14 @@ import {
   FolderOpen,
   Calendar, 
   Clock,
-  Edit,
   CheckCircle,
   AlertCircle,
   FileText,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react';
 import axios from "../../../api/axios";
+import type { Client } from "../../../pages/Clients/Clients";
 
 export type Project = {
   id: number;
@@ -21,26 +22,18 @@ export type Project = {
   status?: 'completed' | 'active' | 'pending';
 };
 
-export type Client = {
-  id: number;
-  name: string;
-  email: string;
-  company: string;
-};
-
 interface ClientProjectsModalProps {
   isOpen: boolean;
   onClose: () => void;
   client: Client;
   onViewProject?: (projectId: number) => void;
-  onEditProject?: (project: Project) => void;
 }
 
 export default function ClientProjectsModal({
   isOpen,
   onClose,
   client,
-  onEditProject
+  onViewProject
 }: ClientProjectsModalProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,7 +49,7 @@ export default function ClientProjectsModal({
     try {
       setLoading(true);
       setError("");
-      const response = await axios.get<Project[]>(`/clients/${client.id}/projects`);
+      const response = await axios.get<Project[]>(`/User/clients/${client.id}/projects`);
       setProjects(response.data);
     } catch (err: any) {
       console.error("Fetch client projects error:", err);
@@ -115,6 +108,10 @@ export default function ClientProjectsModal({
 
   if (!isOpen) return null;
 
+  // Get client display name
+  const clientDisplayName = client.name || 
+    (client.firstName && client.lastName ? `${client.firstName} ${client.lastName}` : client.username);
+
   return (
     <div className={styles.modalOverlay} onClick={handleOverlayClick}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
@@ -122,8 +119,14 @@ export default function ClientProjectsModal({
           <h2 className={styles.modalTitle}>
             <FolderOpen size={24} />
             Projects
-            <span>for {client.name}</span>
+            <span>for {clientDisplayName}</span>
           </h2>
+          <button 
+            className={styles.closeButton}
+            onClick={onClose}
+          >
+            <X size={20} />
+          </button>
         </header>
         
         <div className={styles.modalContent}>
@@ -191,29 +194,18 @@ export default function ClientProjectsModal({
                     </div>
 
                     <div className={styles.projectActions}>
-                      {onEditProject && (
+                      {onViewProject && (
                         <button
-                          className={`${styles.actionButton} ${styles.secondaryAction}`}
+                          className={`${styles.actionButton} ${styles.primaryAction}`}
                           onClick={() => {
-                            onEditProject(project);
+                            onViewProject(project.id);
                             onClose();
                           }}
                         >
-                          <Edit size={14} />
-                          Edit
+                          <FileText size={14} />
+                          View Details
                         </button>
                       )}
-
-                      <button
-                        className={`${styles.actionButton} ${styles.secondaryAction}`}
-                        onClick={() => {
-                          // Handle view project files/documents
-                          console.log('View project files:', project.id);
-                        }}
-                      >
-                        <FileText size={14} />
-                        Files
-                      </button>
                     </div>
                   </div>
                 );

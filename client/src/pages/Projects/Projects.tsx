@@ -25,6 +25,7 @@ import {
   Download
 } from 'lucide-react';
 import axios from "../../api/axios";
+import type { Client } from "../Clients/Clients";
 
 export type Project = {
   id: number;
@@ -40,13 +41,6 @@ export type Project = {
   isOverdue: boolean;
   isCompleted?: boolean;
   totalInvoiceAmount: number;
-};
-
-type Client = {
-  id: number;
-  name: string;
-  email: string;
-  company: string;
 };
 
 type ProjectStats = {
@@ -170,8 +164,15 @@ export default function Projects() {
 
   const fetchClients = async () => {
     try {
-      const response = await axios.get<Client[]>("/clients");
-      setClients(response.data);
+      const response = await axios.get("/user/clients");
+      // Transform user data to include display name for compatibility
+      const transformedClients = response.data.map((client: any) => ({
+        ...client,
+        name: client.firstName && client.lastName 
+          ? `${client.firstName} ${client.lastName}` 
+          : client.username
+      }));
+      setClients(transformedClients);
     } catch (err: any) {
       console.error("Fetch clients error:", err);
     }

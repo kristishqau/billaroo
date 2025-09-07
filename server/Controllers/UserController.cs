@@ -184,8 +184,6 @@ namespace Server.Controllers
         [Authorize(Roles = "freelancer")]
         public async Task<ActionResult<ClientStatsDto>> GetClientStats()
         {
-            var userId = GetUserId();
-
             var totalClients = await _context.Users.CountAsync(u => u.Role == "client");
 
             var clientsWithProjects = await _context.Users
@@ -197,13 +195,24 @@ namespace Server.Controllers
                 .CountAsync(u => _context.Invoices.Any(i => i.ClientId == u.Id &&
                                                            (i.Status == InvoiceStatus.Sent || i.Status == InvoiceStatus.Overdue)));
 
-            var topClientsByRevenue = await _context.Users
+            // First get raw data from DB
+            var revenueData = await _context.Users
                 .Where(u => u.Role == "client")
                 .Select(u => new
                 {
-                    ClientName = !string.IsNullOrEmpty(u.FirstName) && !string.IsNullOrEmpty(u.LastName)
-                        ? u.FirstName + " " + u.LastName
-                        : u.Username,
+                    u.Id,
+                    u.FirstName,
+                    u.LastName,
+                    u.Username
+                })
+                .ToListAsync();
+
+            var topClientsByRevenue = revenueData
+                .Select(u => new ClientRevenueDto
+                {
+                    ClientName = !string.IsNullOrWhiteSpace(u.FirstName) && !string.IsNullOrWhiteSpace(u.LastName)
+                        ? $"{u.FirstName} {u.LastName}"
+                        : u.Username ?? "Unknown",
                     TotalRevenue = _context.Invoices
                         .Where(i => i.ClientId == u.Id && i.Status == InvoiceStatus.Paid)
                         .Sum(i => (decimal?)i.Amount) ?? 0
@@ -211,9 +220,10 @@ namespace Server.Controllers
                 .Where(x => x.TotalRevenue > 0)
                 .OrderByDescending(x => x.TotalRevenue)
                 .Take(5)
-                .ToListAsync();
+                .ToList();
 
-            var firstDayOfMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+            var firstDayOfMonth = new DateTimeOffset(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero).UtcDateTime;
+
             var activeClientsThisMonth = await _context.Users
                 .Where(u => u.Role == "client")
                 .CountAsync(u => u.LastLoginAt.HasValue && u.LastLoginAt.Value >= firstDayOfMonth);

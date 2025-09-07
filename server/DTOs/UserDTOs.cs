@@ -36,12 +36,17 @@ namespace Server.DTOs
     }
 
     // Client stats DTO for freelancer dashboard
+    public class ClientRevenueDto
+    {
+        public string? ClientName { get; set; }
+        public decimal TotalRevenue { get; set; }
+    }
     public class ClientStatsDto
     {
         public int TotalClients { get; set; }
         public int ClientsWithProjects { get; set; }
         public int ClientsWithUnpaidInvoices { get; set; }
-        public object? TopClientsByRevenue { get; set; }
+        public List<ClientRevenueDto> TopClientsByRevenue { get; set; } = new();
         public int ActiveClientsThisMonth { get; set; }
         public int NewClientsThisMonth { get; set; }
     }

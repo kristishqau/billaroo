@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import styles from "./ProjectModal.module.css";
 import { Plus, Edit, X } from 'lucide-react';
+import type { Client } from "../../../pages/Clients/Clients";
 
 export type Project = {
   id?: number;
@@ -8,13 +9,6 @@ export type Project = {
   description: string;
   deadline: string;
   clientId: number;
-};
-
-export type Client = {
-  id: number;
-  name: string;
-  email: string;
-  company: string;
 };
 
 interface ProjectModalProps {
@@ -186,7 +180,7 @@ export default function ProjectModal({
               <option value={0}>Select a client</option>
               {clients.map(client => (
                 <option key={client.id} value={client.id}>
-                  {client.name} {client.company && `(${client.company})`}
+                  {client.username} {client.company && `(${client.company})`}
                 </option>
               ))}
             </select>

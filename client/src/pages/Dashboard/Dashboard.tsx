@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import styles from "./Dashboard.module.css";
-import ClientModal, { type Client as ClientModalType } from "../../components/modals/ClientModal/ClientModal";
 import ProjectModal, { type Project as ProjectModalType } from "../../components/modals/ProjectModal/ProjectModal";
 import InvoiceModal, { type CreateInvoice, type Invoice as InvoiceModalType } from "../../components/modals/InvoiceModal/InvoiceModal";
 import { useAuth } from "../../context/AuthContext";
@@ -25,13 +24,7 @@ import {
 } from 'lucide-react';
 import axios from "../../api/axios";
 import { useNavigate } from "react-router-dom";
-
-type Client = {
-  id: number;
-  name: string;
-  email: string;
-  company: string;
-};
+import type { Client } from "../Clients/Clients";
 
 type Project = {
   id: number;
@@ -67,6 +60,9 @@ type AccountSummary = {
   hasUnpaidInvoices: boolean;
   hasActiveProjects: boolean;
   canDeleteAccount: boolean;
+  totalClients: number;
+  activeProjects: number;
+  thisMonthRevenue: number;
 };
 
 export default function Dashboard() {
@@ -79,15 +75,14 @@ export default function Dashboard() {
   const [summary, setSummary] = useState<AccountSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showClientModal, setShowClientModal] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'projects' | 'invoices'>('overview');
 
   useEffect(() => {
     fetchDashboardData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchDashboardData = async () => {
@@ -99,13 +94,22 @@ export default function Dashboard() {
         // Fetch all data in parallel
         const [summaryRes, clientsRes, projectsRes, invoicesRes] = await Promise.all([
           axios.get<AccountSummary>("/user/account-summary"),
-          axios.get<Client[]>("/clients").catch(() => ({ data: [] })),
+          axios.get<Client[]>("/user/clients").catch(() => ({ data: [] })),
           axios.get<Project[]>("/projects").catch(() => ({ data: [] })),
           axios.get<InvoiceSummary[]>("/invoices").catch(() => ({ data: [] }))
         ]);
 
         setSummary(summaryRes.data);
-        setClients(clientsRes.data.slice(0, 5)); // Show only recent 5
+        
+        // Transform user data to include display name
+        const transformedClients = clientsRes.data.map(client => ({
+          ...client,
+          name: client.firstName && client.lastName 
+            ? `${client.firstName} ${client.lastName}` 
+            : client.username
+        }));
+        
+        setClients(transformedClients.slice(0, 5)); // Show only recent 5
         setProjects(projectsRes.data.slice(0, 5)); // Show only recent 5
         setInvoices(invoicesRes.data.slice(0, 5)); // Show only recent 5
       }
@@ -126,21 +130,6 @@ export default function Dashboard() {
       style: 'currency',
       currency: 'USD'
     }).format(amount);
-  };
-
-  const handleClientSubmit = async (clientData: Omit<ClientModalType, 'id'>) => {
-    try {
-      if (editingClient) {
-        await axios.put(`/clients/${editingClient.id}`, clientData);
-      } else {
-        await axios.post("/clients", clientData);
-      }
-      fetchDashboardData();
-      setEditingClient(null);
-    } catch (err: any) {
-      console.error("Failed to save client:", err);
-      throw err;
-    }
   };
 
   const handleInvoiceSubmit = async (invoiceData: CreateInvoice) => {
@@ -208,13 +197,6 @@ export default function Dashboard() {
 
   const quickActions = [
     {
-      title: "Add Client",
-      description: "Create a new client profile",
-      icon: <Users />,
-      onClick: () => setShowClientModal(true),
-      show: user?.role === 'freelancer'
-    },
-    {
       title: "New Project",
       description: "Start a new project",
       icon: <FolderOpen />,
@@ -222,12 +204,12 @@ export default function Dashboard() {
       show: user?.role === 'freelancer'
     },
     {
-    title: "Create Invoice",
-    description: "Generate a new invoice",
-    icon: <FileText />,
-    onClick: () => setShowInvoiceModal(true),
-    show: user?.role === 'freelancer'
-  },
+      title: "Create Invoice",
+      description: "Generate a new invoice",
+      icon: <FileText />,
+      onClick: () => setShowInvoiceModal(true),
+      show: user?.role === 'freelancer'
+    },
     {
       title: "View Reports",
       description: "Analyze your performance",
@@ -319,7 +301,7 @@ export default function Dashboard() {
                   </div>
                   <div className={styles.statInfo}>
                     <h3 className={styles.statLabel}>Total Clients</h3>
-                    <p className={styles.statValue}>{summary.clientCount}</p>
+                    <p className={styles.statValue}>{summary.totalClients}</p>
                     <span className={styles.statSubtext}>Active relationships</span>
                     <div className={`${styles.statTrend} ${styles.trendUp}`}>
                       <TrendingUp size={12} />
@@ -336,7 +318,7 @@ export default function Dashboard() {
                   </div>
                   <div className={styles.statInfo}>
                     <h3 className={styles.statLabel}>Active Projects</h3>
-                    <p className={styles.statValue}>{summary.projectCount}</p>
+                    <p className={styles.statValue}>{summary.activeProjects}</p>
                     <span className={styles.statSubtext}>In progress</span>
                     <div className={`${styles.statTrend} ${styles.trendNeutral}`}>
                       <Activity size={12} />
@@ -404,11 +386,9 @@ export default function Dashboard() {
                     <PieChart size={24} />
                   </div>
                   <div className={styles.statInfo}>
-                    <h3 className={styles.statLabel}>Account Health</h3>
-                    <p className={styles.statValue}>
-                      {!summary.hasUnpaidInvoices && !summary.hasActiveProjects ? "100%" : "85%"}
-                    </p>
-                    <span className={styles.statSubtext}>Overall status</span>
+                    <h3 className={styles.statLabel}>This Month</h3>
+                    <p className={styles.statValue}>{formatCurrency(summary.thisMonthRevenue)}</p>
+                    <span className={styles.statSubtext}>Monthly revenue</span>
                     {summary.hasActiveProjects && (
                       <div className={`${styles.statTrend} ${styles.trendUp}`}>
                         🚀 Active projects
@@ -504,7 +484,7 @@ export default function Dashboard() {
                             <Users size={14} />
                           </div>
                           <div className={styles.activityContent}>
-                            <p className={styles.activityText}>New client "Tech Startup Inc" added</p>
+                            <p className={styles.activityText}>New client relationship established</p>
                             <span className={styles.activityTime}>1 day ago</span>
                           </div>
                         </div>
@@ -549,15 +529,15 @@ export default function Dashboard() {
                         </div>
                         <h3 className={styles.emptyTitle}>No clients yet</h3>
                         <p className={styles.emptyDescription}>
-                          Start building your client base by adding your first client. 
-                          You can manage their projects, invoices, and communications all in one place.
+                          As you work with clients and create projects, they'll appear here automatically. 
+                          Start by creating your first project or sending an invoice to begin building your client relationships.
                         </p>
                         <button 
                           className={styles.emptyAction}
-                          onClick={() => setShowClientModal(true)}
+                          onClick={() => setShowProjectModal(true)}
                         >
                           <Plus size={16} />
-                          Add Your First Client
+                          Create Your First Project
                         </button>
                       </div>
                     ) : (
@@ -568,20 +548,10 @@ export default function Dashboard() {
                             <div className={styles.cardActions}>
                               <button 
                                 className={styles.iconButton} 
-                                title="View Client"
+                                title="View Client Details"
                                 onClick={() => navigate('/clients')}
                               >
                                 <Eye size={16} />
-                              </button>
-                              <button 
-                                className={styles.iconButton} 
-                                title="Edit Client"
-                                onClick={() => {
-                                  setEditingClient(client);
-                                  setShowClientModal(true);
-                                }}
-                              >
-                                <Edit size={16} />
                               </button>
                             </div>
                           </div>
@@ -819,17 +789,7 @@ export default function Dashboard() {
           </div>
         )}
       </div>
-      {/* Client Modal */}
-      <ClientModal
-        isOpen={showClientModal}
-        onClose={() => {
-          setShowClientModal(false);
-          setEditingClient(null);
-        }}
-        onSubmit={handleClientSubmit}
-        client={editingClient}
-        mode={editingClient ? 'edit' : 'add'}
-      />
+
       {/* Project Modal */}
       <ProjectModal
         isOpen={showProjectModal}
@@ -842,6 +802,7 @@ export default function Dashboard() {
         clients={clients}
         mode={editingProject ? 'edit' : 'add'}
       />
+
       {/* Invoice Modal */}
       <InvoiceModal
         isOpen={showInvoiceModal}
