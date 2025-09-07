@@ -49,8 +49,8 @@ export default function ResetPassword() {
 
     try {
       await axios.post("/Auth/reset-password", {
-        token,
-        newPassword: password
+        Token: token,
+        NewPassword: password 
       });
       
       setSuccess(true);
