@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Server.Models
 {
@@ -29,7 +29,7 @@ namespace Server.Models
         public Project? Project { get; set; }
 
         public int ClientId { get; set; }
-        public Client? Client { get; set; }
+        public User? Client { get; set; }
 
         public int FreelancerId { get; set; }
         public User? Freelancer { get; set; }

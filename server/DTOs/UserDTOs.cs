@@ -2,7 +2,49 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Server.DTOs
 {
-    // Enhanced User Profile DTO
+    public class UserDto
+    {
+        public int Id { get; set; }
+        public string? Username { get; set; }
+        public string? Email { get; set; }
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? Company { get; set; }
+        public string? Role { get; set; }
+        public string DisplayName => !string.IsNullOrEmpty(FirstName) && !string.IsNullOrEmpty(LastName)
+            ? $"{FirstName} {LastName}" : Username ?? "Unknown";
+    }
+
+    public class UserDetailDto
+    {
+        public int Id { get; set; }
+        public string? Username { get; set; }
+        public string? Email { get; set; }
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? Company { get; set; }
+        public string? Role { get; set; }
+        public string DisplayName => !string.IsNullOrEmpty(FirstName) && !string.IsNullOrEmpty(LastName)
+            ? $"{FirstName} {LastName}" : Username ?? "Unknown";
+
+        // Business metrics (for clients viewed by freelancers)
+        public int ProjectCount { get; set; }
+        public decimal TotalInvoiceAmount { get; set; }
+        public decimal PaidInvoiceAmount { get; set; }
+        public DateTime? LastActivity { get; set; }
+        public bool IsActive { get; set; }
+    }
+
+    // Client stats DTO for freelancer dashboard
+    public class ClientStatsDto
+    {
+        public int TotalClients { get; set; }
+        public int ClientsWithProjects { get; set; }
+        public int ClientsWithUnpaidInvoices { get; set; }
+        public object? TopClientsByRevenue { get; set; }
+        public int ActiveClientsThisMonth { get; set; }
+        public int NewClientsThisMonth { get; set; }
+    }
     public class UserProfileDto
     {
         public int Id { get; set; }

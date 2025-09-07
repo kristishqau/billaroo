@@ -22,36 +22,6 @@ namespace Server.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Server.Models.Client", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Company")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Email")
-                        .HasColumnType("text");
-
-                    b.Property<int>("FreelancerId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Email");
-
-                    b.HasIndex("FreelancerId");
-
-                    b.ToTable("Clients");
-                });
-
             modelBuilder.Entity("Server.Models.Conversation", b =>
                 {
                     b.Property<int>("Id")
@@ -878,17 +848,6 @@ namespace Server.Migrations
                     b.ToTable("UserSkills");
                 });
 
-            modelBuilder.Entity("Server.Models.Client", b =>
-                {
-                    b.HasOne("Server.Models.User", "Freelancer")
-                        .WithMany()
-                        .HasForeignKey("FreelancerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Freelancer");
-                });
-
             modelBuilder.Entity("Server.Models.Conversation", b =>
                 {
                     b.HasOne("Server.Models.User", "Client")
@@ -936,7 +895,7 @@ namespace Server.Migrations
 
             modelBuilder.Entity("Server.Models.Invoice", b =>
                 {
-                    b.HasOne("Server.Models.Client", "Client")
+                    b.HasOne("Server.Models.User", "Client")
                         .WithMany()
                         .HasForeignKey("ClientId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -1045,10 +1004,10 @@ namespace Server.Migrations
 
             modelBuilder.Entity("Server.Models.Project", b =>
                 {
-                    b.HasOne("Server.Models.Client", "Client")
+                    b.HasOne("Server.Models.User", "Client")
                         .WithMany()
                         .HasForeignKey("ClientId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Server.Models.User", null)

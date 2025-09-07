@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import axios from '../../../api/axios';
 import { CheckCircle, XCircle } from 'lucide-react';
+import { useEmailVerification } from '../../../hooks/useSecurity';
 import styles from './VerifyEmail.module.css';
 
 export default function VerifyEmail() {
@@ -9,6 +9,8 @@ export default function VerifyEmail() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
+
+  const { handleVerifyEmail, isVerifying } = useEmailVerification();
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -20,21 +22,28 @@ export default function VerifyEmail() {
     }
 
     verifyEmail(token);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const verifyEmail = async (token: string) => {
     try {
-      await axios.post('/auth/verify-email', { token });
-      setStatus('success');
-      setMessage('Email verified successfully! You can now use all features of your account.');
-      
-      // Redirect to profile or dashboard after 3 seconds
-      setTimeout(() => {
-        navigate('/profile');
-      }, 3000);
-    } catch (err: any) {
+      setStatus('loading');
+      const result = await handleVerifyEmail(token);
+      if (result.success) {
+        setStatus('success');
+        setMessage('Email verified successfully! You can now use all features of your account.');
+        
+        // Redirect to profile or dashboard after 3 seconds
+        setTimeout(() => {
+          navigate('/profile');
+        }, 3000);
+      } else {
+        setStatus('error');
+        setMessage(result.error || 'Email verification failed. The link may be invalid or expired.');
+      }
+    } catch {
       setStatus('error');
-      setMessage(err.response?.data?.message || 'Email verification failed. The link may be invalid or expired.');
+      setMessage('An unexpected error occurred during verification.');
     }
   };
 
@@ -59,7 +68,7 @@ export default function VerifyEmail() {
             <div className={styles.tagline}>Freelancer Management Platform</div>
           </div>
 
-          {status === 'loading' && (
+          {(status === 'loading' || isVerifying) && (
             <>
               <div className={styles.loadingSpinner}></div>
               <h2 className={`${styles.title} ${styles.loadingTitle}`}>Verifying Email...</h2>
@@ -89,7 +98,7 @@ export default function VerifyEmail() {
           )}
         </div>
 
-        {status !== 'loading' && (
+        {status !== 'loading' && !isVerifying && (
           <div className={styles.actions}>
             {status === 'success' ? (
               <>

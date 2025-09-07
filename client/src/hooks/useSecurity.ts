@@ -128,6 +128,7 @@ export const useTwoFactorAuth = () => {
 
 export const useEmailVerification = () => {
   const [isResending, setIsResending] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const notification = useNotification();
 
   const handleResendVerification = async () => {
@@ -144,9 +145,28 @@ export const useEmailVerification = () => {
     }
   };
 
+  const handleVerifyEmail = async (token: string) => {
+    setIsVerifying(true);
+    notification.clearNotification();
+
+    try {
+      await axios.post('/auth/verify-email', { token });
+      notification.showSuccess('Email verified successfully! You can now use all features of your account.');
+      return { success: true };
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || 'Email verification failed. The link may be invalid or expired.';
+      notification.showError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   return {
     isResending,
+    isVerifying,
     handleResendVerification,
+    handleVerifyEmail,
     notification
   };
 };

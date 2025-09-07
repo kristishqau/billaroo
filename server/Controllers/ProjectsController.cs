@@ -10,7 +10,7 @@ namespace Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "freelancer")]
+    [Authorize]
     public class ProjectsController(AppDbContext context) : ControllerBase
     {
         private readonly AppDbContext _context = context;
@@ -18,7 +18,11 @@ namespace Server.Controllers
         private int GetUserId() =>
             int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
+        private string GetUserRole() =>
+            User.FindFirstValue(ClaimTypes.Role)!;
+
         [HttpPost]
+        [Authorize(Roles = "freelancer")]
         public async Task<ActionResult<ProjectDto>> CreateProject(CreateProjectDto dto)
         {
             // Validate required fields
@@ -28,11 +32,12 @@ namespace Server.Controllers
             if (dto.Deadline <= DateTime.UtcNow)
                 return BadRequest("Project deadline must be in the future.");
 
-            var client = await _context.Clients
-                .FirstOrDefaultAsync(c => c.Id == dto.ClientId && c.FreelancerId == GetUserId());
+            // Verify the client exists and has client role
+            var client = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id == dto.ClientId && u.Role == "client");
 
             if (client == null)
-                return BadRequest("Client not found or not yours.");
+                return BadRequest("Client not found.");
 
             var project = new Project
             {
@@ -59,28 +64,64 @@ namespace Server.Controllers
         public async Task<ActionResult<List<ProjectDetailDto>>> GetMyProjects()
         {
             var userId = GetUserId();
+            var userRole = GetUserRole();
 
-            var projects = await _context.Projects
-                .Include(p => p.Client)
-                .Where(p => p.Client!.FreelancerId == userId)
-                .Select(p => new ProjectDetailDto
-                {
-                    Id = p.Id,
-                    Title = p.Title,
-                    Description = p.Description,
-                    Deadline = p.Deadline,
-                    ClientId = p.ClientId,
-                    ClientName = p.Client!.Name,
-                    ClientCompany = p.Client.Company,
-                    InvoiceCount = _context.Invoices.Count(i => i.ProjectId == p.Id),
-                    FileCount = _context.ProjectFiles.Count(pf => pf.ProjectId == p.Id),
-                    IsOverdue = p.Deadline < DateTime.UtcNow,
-                    TotalInvoiceAmount = _context.Invoices
-                        .Where(i => i.ProjectId == p.Id)
-                        .Sum(i => (decimal?)i.Amount) ?? 0
-                })
-                .OrderBy(p => p.Deadline)
-                .ToListAsync();
+            List<ProjectDetailDto> projects;
+
+            if (userRole == "freelancer")
+            {
+                // Freelancers see all projects (you may want to add business logic to filter by their clients)
+                projects = await _context.Projects
+                    .Include(p => p.Client)
+                    .Where(p => p.Client!.Role == "client")
+                    .Select(p => new ProjectDetailDto
+                    {
+                        Id = p.Id,
+                        Title = p.Title,
+                        Description = p.Description,
+                        Deadline = p.Deadline,
+                        ClientId = p.ClientId,
+                        ClientName = !string.IsNullOrEmpty(p.Client!.FirstName) && !string.IsNullOrEmpty(p.Client.LastName)
+                            ? p.Client.FirstName + " " + p.Client.LastName
+                            : p.Client.Username,
+                        ClientCompany = p.Client.Company,
+                        InvoiceCount = _context.Invoices.Count(i => i.ProjectId == p.Id),
+                        FileCount = _context.ProjectFiles.Count(pf => pf.ProjectId == p.Id),
+                        IsOverdue = p.Deadline < DateTime.UtcNow,
+                        TotalInvoiceAmount = _context.Invoices
+                            .Where(i => i.ProjectId == p.Id)
+                            .Sum(i => (decimal?)i.Amount) ?? 0
+                    })
+                    .OrderBy(p => p.Deadline)
+                    .ToListAsync();
+            }
+            else // client role
+            {
+                // Clients see only their own projects
+                projects = await _context.Projects
+                    .Include(p => p.Client)
+                    .Where(p => p.ClientId == userId)
+                    .Select(p => new ProjectDetailDto
+                    {
+                        Id = p.Id,
+                        Title = p.Title,
+                        Description = p.Description,
+                        Deadline = p.Deadline,
+                        ClientId = p.ClientId,
+                        ClientName = !string.IsNullOrEmpty(p.Client!.FirstName) && !string.IsNullOrEmpty(p.Client.LastName)
+                            ? p.Client.FirstName + " " + p.Client.LastName
+                            : p.Client.Username,
+                        ClientCompany = p.Client.Company,
+                        InvoiceCount = _context.Invoices.Count(i => i.ProjectId == p.Id),
+                        FileCount = _context.ProjectFiles.Count(pf => pf.ProjectId == p.Id),
+                        IsOverdue = p.Deadline < DateTime.UtcNow,
+                        TotalInvoiceAmount = _context.Invoices
+                            .Where(i => i.ProjectId == p.Id)
+                            .Sum(i => (decimal?)i.Amount) ?? 0
+                    })
+                    .OrderBy(p => p.Deadline)
+                    .ToListAsync();
+            }
 
             return Ok(projects);
         }
@@ -89,10 +130,19 @@ namespace Server.Controllers
         public async Task<ActionResult<ProjectDetailDto>> GetProject(int id)
         {
             var userId = GetUserId();
+            var userRole = GetUserRole();
 
-            var project = await _context.Projects
+            var query = _context.Projects
                 .Include(p => p.Client)
-                .Where(p => p.Id == id && p.Client!.FreelancerId == userId)
+                .Where(p => p.Id == id);
+
+            // Apply role-based filtering
+            if (userRole == "client")
+            {
+                query = query.Where(p => p.ClientId == userId);
+            }
+
+            var project = await query
                 .Select(p => new ProjectDetailDto
                 {
                     Id = p.Id,
@@ -100,7 +150,9 @@ namespace Server.Controllers
                     Description = p.Description,
                     Deadline = p.Deadline,
                     ClientId = p.ClientId,
-                    ClientName = p.Client!.Name,
+                    ClientName = !string.IsNullOrEmpty(p.Client!.FirstName) && !string.IsNullOrEmpty(p.Client.LastName)
+                        ? p.Client.FirstName + " " + p.Client.LastName
+                        : p.Client.Username,
                     ClientCompany = p.Client.Company,
                     InvoiceCount = _context.Invoices.Count(i => i.ProjectId == p.Id),
                     FileCount = _context.ProjectFiles.Count(pf => pf.ProjectId == p.Id),
@@ -121,10 +173,18 @@ namespace Server.Controllers
         public async Task<ActionResult<ProjectDto>> UpdateProject(int id, UpdateProjectDto dto)
         {
             var userId = GetUserId();
+            var userRole = GetUserRole();
 
-            var project = await _context.Projects
-                .Include(p => p.Client)
-                .FirstOrDefaultAsync(p => p.Id == id && p.Client!.FreelancerId == userId);
+            IQueryable<Project> query = _context.Projects
+                .Include(p => p.Client);
+
+            // Apply role-based filtering
+            if (userRole == "client")
+            {
+                query = query.Where(p => p.ClientId == userId);
+            }
+
+            var project = await query.FirstOrDefaultAsync(p => p.Id == id);
 
             if (project == null)
                 return NotFound("Project not found or access denied.");
@@ -136,14 +196,18 @@ namespace Server.Controllers
             if (dto.Deadline <= DateTime.UtcNow)
                 return BadRequest("Project deadline must be in the future.");
 
-            // If client is being changed, verify new client belongs to freelancer
+            // If client is being changed, verify new client exists and has client role
             if (dto.ClientId != project.ClientId)
             {
-                var newClient = await _context.Clients
-                    .FirstOrDefaultAsync(c => c.Id == dto.ClientId && c.FreelancerId == userId);
+                // Only freelancers can change project clients
+                if (userRole != "freelancer")
+                    return BadRequest("Only freelancers can change project clients.");
+
+                var newClient = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Id == dto.ClientId && u.Role == "client");
 
                 if (newClient == null)
-                    return BadRequest("New client not found or not yours.");
+                    return BadRequest("New client not found or invalid.");
 
                 // Check if project has invoices - changing client would break invoice relationships
                 var hasInvoices = await _context.Invoices.AnyAsync(i => i.ProjectId == id);
@@ -155,7 +219,10 @@ namespace Server.Controllers
             project.Title = dto.Title;
             project.Description = dto.Description;
             project.Deadline = dto.Deadline;
-            project.ClientId = dto.ClientId;
+            if (userRole == "freelancer") // Only freelancers can change client
+            {
+                project.ClientId = dto.ClientId;
+            }
 
             await _context.SaveChangesAsync();
 
@@ -170,16 +237,15 @@ namespace Server.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "freelancer")]
         public async Task<ActionResult> DeleteProject(int id)
         {
-            var userId = GetUserId();
-
             var project = await _context.Projects
                 .Include(p => p.Client)
-                .FirstOrDefaultAsync(p => p.Id == id && p.Client!.FreelancerId == userId);
+                .FirstOrDefaultAsync(p => p.Id == id);
 
             if (project == null)
-                return NotFound("Project not found or access denied.");
+                return NotFound("Project not found.");
 
             // Check for existing invoices
             var hasInvoices = await _context.Invoices
@@ -219,12 +285,18 @@ namespace Server.Controllers
         public async Task<ActionResult<List<ProjectDto>>> GetProjectsByClient(int clientId)
         {
             var userId = GetUserId();
+            var userRole = GetUserRole();
 
-            var isOwner = await _context.Clients
-                .AnyAsync(c => c.Id == clientId && c.FreelancerId == userId);
+            // Verify the user exists and has client role
+            var clientUser = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id == clientId && u.Role == "client");
 
-            if (!isOwner)
-                return BadRequest("Client not found or access denied.");
+            if (clientUser == null)
+                return BadRequest("Client not found.");
+
+            // Role-based access control
+            if (userRole == "client" && clientId != userId)
+                return BadRequest("Access denied."); // Clients can only see their own projects
 
             var projects = await _context.Projects
                 .Where(p => p.ClientId == clientId)
@@ -246,11 +318,18 @@ namespace Server.Controllers
         public async Task<ActionResult<List<ProjectFileDto>>> GetProjectFiles(int id)
         {
             var userId = GetUserId();
+            var userRole = GetUserRole();
 
-            // Verify project belongs to freelancer
-            var projectExists = await _context.Projects
-                .Include(p => p.Client)
-                .AnyAsync(p => p.Id == id && p.Client!.FreelancerId == userId);
+            // Verify project exists and user has access
+            IQueryable<Project> projectQuery = _context.Projects
+                .Include(p => p.Client);
+
+            if (userRole == "client")
+            {
+                projectQuery = projectQuery.Where(p => p.ClientId == userId);
+            }
+
+            var projectExists = await projectQuery.AnyAsync(p => p.Id == id);
 
             if (!projectExists)
                 return NotFound("Project not found or access denied.");
@@ -278,21 +357,36 @@ namespace Server.Controllers
         public async Task<ActionResult<List<InvoiceDto>>> GetProjectInvoices(int id)
         {
             var userId = GetUserId();
+            var userRole = GetUserRole();
 
-            // Verify project belongs to freelancer
-            var projectExists = await _context.Projects
-                .Include(p => p.Client)
-                .AnyAsync(p => p.Id == id && p.Client!.FreelancerId == userId);
+            // Verify project exists and user has access
+            IQueryable<Project> projectQuery = _context.Projects
+                .Include(p => p.Client);
+
+            if (userRole == "client")
+            {
+                projectQuery = projectQuery.Where(p => p.ClientId == userId);
+            }
+
+            var projectExists = await projectQuery.AnyAsync(p => p.Id == id);
 
             if (!projectExists)
                 return NotFound("Project not found or access denied.");
 
-            var invoices = await _context.Invoices
+            var invoiceQuery = _context.Invoices
                 .Include(i => i.Items)
                 .Include(i => i.Project)
                 .Include(i => i.Client)
                 .Include(i => i.Payments)
-                .Where(i => i.ProjectId == id)
+                .Where(i => i.ProjectId == id);
+
+            // Additional filtering for clients
+            if (userRole == "client")
+            {
+                invoiceQuery = invoiceQuery.Where(i => i.ClientId == userId);
+            }
+
+            var invoices = await invoiceQuery
                 .OrderByDescending(i => i.CreatedAt)
                 .ToListAsync();
 
@@ -303,10 +397,22 @@ namespace Server.Controllers
         public async Task<ActionResult<List<ProjectDetailDto>>> GetOverdueProjects()
         {
             var userId = GetUserId();
+            var userRole = GetUserRole();
 
-            var overdueProjects = await _context.Projects
+            var query = _context.Projects
                 .Include(p => p.Client)
-                .Where(p => p.Client!.FreelancerId == userId && p.Deadline < DateTime.UtcNow)
+                .Where(p => p.Deadline < DateTime.UtcNow);
+
+            if (userRole == "client")
+            {
+                query = query.Where(p => p.ClientId == userId);
+            }
+            else if (userRole == "freelancer")
+            {
+                query = query.Where(p => p.Client!.Role == "client");
+            }
+
+            var overdueProjects = await query
                 .Select(p => new ProjectDetailDto
                 {
                     Id = p.Id,
@@ -314,7 +420,9 @@ namespace Server.Controllers
                     Description = p.Description,
                     Deadline = p.Deadline,
                     ClientId = p.ClientId,
-                    ClientName = p.Client!.Name,
+                    ClientName = !string.IsNullOrEmpty(p.Client!.FirstName) && !string.IsNullOrEmpty(p.Client.LastName)
+                        ? p.Client.FirstName + " " + p.Client.LastName
+                        : p.Client.Username,
                     ClientCompany = p.Client.Company,
                     InvoiceCount = _context.Invoices.Count(i => i.ProjectId == p.Id),
                     FileCount = _context.ProjectFiles.Count(pf => pf.ProjectId == p.Id),
@@ -333,10 +441,16 @@ namespace Server.Controllers
         public async Task<ActionResult> ExtendDeadline(int id, ExtendDeadlineDto dto)
         {
             var userId = GetUserId();
+            var userRole = GetUserRole();
 
-            var project = await _context.Projects
-                .Include(p => p.Client)
-                .FirstOrDefaultAsync(p => p.Id == id && p.Client!.FreelancerId == userId);
+            IQueryable<Project> query = _context.Projects.Include(p => p.Client);
+
+            if (userRole == "client")
+            {
+                query = query.Where(p => p.ClientId == userId);
+            }
+
+            var project = await query.FirstOrDefaultAsync(p => p.Id == id);
 
             if (project == null)
                 return NotFound("Project not found or access denied.");
@@ -357,7 +471,7 @@ namespace Server.Controllers
             });
         }
 
-        // Helper method to map Invoice to InvoiceDto (reused from InvoicesController)
+        // Helper method to map Invoice to InvoiceDto
         private static InvoiceDto MapToInvoiceDto(Invoice invoice)
         {
             return new InvoiceDto
@@ -373,19 +487,21 @@ namespace Server.Controllers
                 ProjectId = invoice.ProjectId,
                 ProjectTitle = invoice.Project?.Title ?? "N/A",
                 ClientId = invoice.ClientId,
-                ClientName = invoice.Client?.Name ?? "N/A",
+                ClientName = !string.IsNullOrEmpty(invoice.Client?.FirstName) && !string.IsNullOrEmpty(invoice.Client?.LastName)
+                    ? invoice.Client.FirstName + " " + invoice.Client.LastName
+                    : invoice.Client?.Username ?? "N/A",
                 CreatedAt = invoice.CreatedAt,
                 SentAt = invoice.SentAt,
                 PaidAt = invoice.PaidAt,
-                Items = invoice.Items.Select(item => new InvoiceItemDto
+                Items = invoice.Items?.Select(item => new InvoiceItemDto
                 {
                     Id = item.Id,
                     Description = item.Description,
                     Quantity = item.Quantity,
                     Rate = item.Rate,
                     Total = item.Total
-                }).ToList(),
-                Payments = invoice.Payments.Select(payment => new PaymentDto
+                }).ToList() ?? [],
+                Payments = invoice.Payments?.Select(payment => new PaymentDto
                 {
                     Id = payment.Id,
                     Amount = payment.Amount,
@@ -395,7 +511,7 @@ namespace Server.Controllers
                     TransactionId = payment.TransactionId,
                     Notes = payment.Notes,
                     CreatedAt = payment.CreatedAt
-                }).ToList()
+                }).ToList() ?? []
             };
         }
     }

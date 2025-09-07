@@ -1,4 +1,4 @@
-﻿using QuestPDF.Fluent;
+using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using Server.Models;
@@ -56,7 +56,7 @@ namespace Server.Services
                                 row.RelativeItem().Column(column =>
                                 {
                                     column.Item().Text("Bill To:").Bold();
-                                    column.Item().Text(invoice.Client?.Name ?? "N/A");
+                                    column.Item().Text(invoice.Client?.Username ?? "N/A");
                                     if (!string.IsNullOrEmpty(invoice.Client?.Company))
                                         column.Item().Text(invoice.Client.Company);
                                     if (!string.IsNullOrEmpty(invoice.Client?.Email))

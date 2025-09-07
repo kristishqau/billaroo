@@ -14,30 +14,226 @@ namespace Server.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class UserController : ControllerBase
+    public class UserController(
+        AppDbContext context,
+        ISmsService smsService,
+        IFileUploadService fileUploadService,
+        ITwoFactorService twoFactorService,
+        ISecurityAuditService securityAuditService) : ControllerBase
     {
-        private readonly AppDbContext _context;
-        private readonly ISmsService _smsService;
-        private readonly IFileUploadService _fileUploadService;
-        private readonly ITwoFactorService _twoFactorService;
-        private readonly ISecurityAuditService _securityAuditService;
-
-        public UserController(
-            AppDbContext context,
-            ISmsService smsService,
-            IFileUploadService fileUploadService,
-            ITwoFactorService twoFactorService,
-            ISecurityAuditService securityAuditService)
-        {
-            _context = context;
-            _smsService = smsService;
-            _fileUploadService = fileUploadService;
-            _twoFactorService = twoFactorService;
-            _securityAuditService = securityAuditService;
-        }
+        private readonly AppDbContext _context = context;
+        private readonly ISmsService _smsService = smsService;
+        private readonly IFileUploadService _fileUploadService = fileUploadService;
+        private readonly ITwoFactorService _twoFactorService = twoFactorService;
+        private readonly ISecurityAuditService _securityAuditService = securityAuditService;
+        private static readonly string[] sourceArray = ["FirstName", "LastName", "Bio"];
 
         private int GetUserId() =>
             int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        private string GetUserRole() =>
+            User.FindFirstValue(ClaimTypes.Role)!;
+
+        #region Client Management (for Freelancers)
+
+        [HttpGet("clients")]
+        [Authorize(Roles = "freelancer")]
+        public async Task<ActionResult<List<UserDto>>> GetMyClients()
+        {
+            var userId = GetUserId();
+
+            // Get all users with client role
+            // Note: You may want to add business logic to filter clients by relationship to freelancer
+            var clients = await _context.Users
+                .Where(u => u.Role == "client")
+                .Select(u => new UserDto
+                {
+                    Id = u.Id,
+                    Username = u.Username,
+                    Email = u.Email,
+                    FirstName = u.FirstName,
+                    LastName = u.LastName,
+                    Company = u.Company,
+                    Role = u.Role
+                })
+                .OrderBy(u => u.FirstName)
+                .ThenBy(u => u.LastName)
+                .ToListAsync();
+
+            return Ok(clients);
+        }
+
+        [HttpGet("clients/{id}")]
+        [Authorize(Roles = "freelancer")]
+        public async Task<ActionResult<UserDetailDto>> GetClientDetail(int id)
+        {
+            var userId = GetUserId();
+
+            var client = await _context.Users
+                .Where(u => u.Id == id && u.Role == "client")
+                .Select(u => new UserDetailDto
+                {
+                    Id = u.Id,
+                    Username = u.Username,
+                    Email = u.Email,
+                    FirstName = u.FirstName,
+                    LastName = u.LastName,
+                    Company = u.Company,
+                    Role = u.Role,
+                    ProjectCount = _context.Projects.Count(p => p.ClientId == u.Id),
+                    TotalInvoiceAmount = _context.Invoices
+                        .Where(i => i.ClientId == u.Id)
+                        .Sum(i => (decimal?)i.Amount) ?? 0,
+                    PaidInvoiceAmount = _context.Invoices
+                        .Where(i => i.ClientId == u.Id && i.Status == InvoiceStatus.Paid)
+                        .Sum(i => (decimal?)i.Amount) ?? 0,
+                    LastActivity = u.LastLoginAt,
+                    IsActive = u.LastLoginAt.HasValue && u.LastLoginAt.Value > DateTime.UtcNow.AddDays(-30)
+                })
+                .FirstOrDefaultAsync();
+
+            if (client == null)
+                return NotFound("Client not found.");
+
+            return Ok(client);
+        }
+
+        [HttpGet("clients/{id}/projects")]
+        [Authorize(Roles = "freelancer")]
+        public async Task<ActionResult<List<ProjectDto>>> GetClientProjects(int id)
+        {
+            // Verify client exists and is actually a client
+            var clientExists = await _context.Users
+                .AnyAsync(u => u.Id == id && u.Role == "client");
+
+            if (!clientExists)
+                return NotFound("Client not found.");
+
+            var projects = await _context.Projects
+                .Where(p => p.ClientId == id)
+                .Select(p => new ProjectDto
+                {
+                    Id = p.Id,
+                    Title = p.Title,
+                    Description = p.Description,
+                    Deadline = p.Deadline,
+                    ClientId = p.ClientId
+                })
+                .OrderBy(p => p.Deadline)
+                .ToListAsync();
+
+            return Ok(projects);
+        }
+
+        [HttpGet("clients/{id}/invoices")]
+        [Authorize(Roles = "freelancer")]
+        public async Task<ActionResult<List<InvoiceDto>>> GetClientInvoices(int id)
+        {
+            var userId = GetUserId();
+
+            // Verify client exists and is actually a client
+            var clientExists = await _context.Users
+                .AnyAsync(u => u.Id == id && u.Role == "client");
+
+            if (!clientExists)
+                return NotFound("Client not found.");
+
+            var invoices = await _context.Invoices
+                .Include(i => i.Items)
+                .Include(i => i.Project)
+                .Include(i => i.Payments)
+                .Where(i => i.ClientId == id && i.FreelancerId == userId)
+                .OrderByDescending(i => i.CreatedAt)
+                .ToListAsync();
+
+            return Ok(invoices.Select(MapToInvoiceDto).ToList());
+        }
+
+        [HttpGet("clients/search")]
+        [Authorize(Roles = "freelancer")]
+        public async Task<ActionResult<List<UserDto>>> SearchClients([FromQuery] string searchTerm)
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm))
+                return await GetMyClients();
+
+            var clients = await _context.Users
+                .Where(u => u.Role == "client" &&
+                           (u.FirstName!.Contains(searchTerm) ||
+                            u.LastName!.Contains(searchTerm) ||
+                            u.Email.Contains(searchTerm) ||
+                            u.Company!.Contains(searchTerm) ||
+                            u.Username.Contains(searchTerm)))
+                .Select(u => new UserDto
+                {
+                    Id = u.Id,
+                    Username = u.Username,
+                    Email = u.Email,
+                    FirstName = u.FirstName,
+                    LastName = u.LastName,
+                    Company = u.Company,
+                    Role = u.Role
+                })
+                .OrderBy(u => u.FirstName)
+                .ThenBy(u => u.LastName)
+                .ToListAsync();
+
+            return Ok(clients);
+        }
+
+        [HttpGet("clients/stats")]
+        [Authorize(Roles = "freelancer")]
+        public async Task<ActionResult<ClientStatsDto>> GetClientStats()
+        {
+            var userId = GetUserId();
+
+            var totalClients = await _context.Users.CountAsync(u => u.Role == "client");
+
+            var clientsWithProjects = await _context.Users
+                .Where(u => u.Role == "client")
+                .CountAsync(u => _context.Projects.Any(p => p.ClientId == u.Id));
+
+            var clientsWithUnpaidInvoices = await _context.Users
+                .Where(u => u.Role == "client")
+                .CountAsync(u => _context.Invoices.Any(i => i.ClientId == u.Id &&
+                                                           (i.Status == InvoiceStatus.Sent || i.Status == InvoiceStatus.Overdue)));
+
+            var topClientsByRevenue = await _context.Users
+                .Where(u => u.Role == "client")
+                .Select(u => new
+                {
+                    ClientName = !string.IsNullOrEmpty(u.FirstName) && !string.IsNullOrEmpty(u.LastName)
+                        ? u.FirstName + " " + u.LastName
+                        : u.Username,
+                    TotalRevenue = _context.Invoices
+                        .Where(i => i.ClientId == u.Id && i.Status == InvoiceStatus.Paid)
+                        .Sum(i => (decimal?)i.Amount) ?? 0
+                })
+                .Where(x => x.TotalRevenue > 0)
+                .OrderByDescending(x => x.TotalRevenue)
+                .Take(5)
+                .ToListAsync();
+
+            var firstDayOfMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+            var activeClientsThisMonth = await _context.Users
+                .Where(u => u.Role == "client")
+                .CountAsync(u => u.LastLoginAt.HasValue && u.LastLoginAt.Value >= firstDayOfMonth);
+
+            var newClientsThisMonth = await _context.Users
+                .Where(u => u.Role == "client" && u.CreatedAt >= firstDayOfMonth)
+                .CountAsync();
+
+            return Ok(new ClientStatsDto
+            {
+                TotalClients = totalClients,
+                ClientsWithProjects = clientsWithProjects,
+                ClientsWithUnpaidInvoices = clientsWithUnpaidInvoices,
+                TopClientsByRevenue = topClientsByRevenue,
+                ActiveClientsThisMonth = activeClientsThisMonth,
+                NewClientsThisMonth = newClientsThisMonth
+            });
+        }
+
+        #endregion
 
         #region Profile Management
 
@@ -285,8 +481,8 @@ namespace Server.Controllers
 
             return Ok(new
             {
-                secret = secret,
-                qrCodeUrl = qrCodeUrl,
+                secret,
+                qrCodeUrl,
                 message = "Scan the QR code with your authenticator app and confirm with a code."
             });
         }
@@ -378,7 +574,7 @@ namespace Server.Controllers
                 await _securityAuditService.LogAsync(userId, "profile_image_uploaded",
                     "User profile image uploaded", HttpContext);
 
-                return Ok(new { message = "Profile image uploaded successfully.", fileUrl = fileUrl });
+                return Ok(new { message = "Profile image uploaded successfully.", fileUrl });
             }
             catch (Exception ex)
             {
@@ -412,7 +608,7 @@ namespace Server.Controllers
                 await _securityAuditService.LogAsync(userId, "cv_uploaded",
                     "User CV uploaded", HttpContext);
 
-                return Ok(new { message = "CV uploaded successfully.", fileUrl = fileUrl });
+                return Ok(new { message = "CV uploaded successfully.", fileUrl });
             }
             catch (Exception ex)
             {
@@ -453,7 +649,7 @@ namespace Server.Controllers
 
                 return Ok(new { message = "Verification document uploaded successfully. It will be reviewed within 24-48 hours." });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500, "Failed to upload verification document.");
             }
@@ -469,7 +665,7 @@ namespace Server.Controllers
             var userId = GetUserId();
 
             var existingSkill = await _context.UserSkills
-                .FirstOrDefaultAsync(s => s.UserId == userId && s.SkillName.ToLower() == dto.SkillName.ToLower());
+                .FirstOrDefaultAsync(s => s.UserId == userId && s.SkillName.Equals(dto.SkillName, StringComparison.CurrentCultureIgnoreCase));
 
             if (existingSkill != null)
                 return BadRequest("Skill already exists.");
@@ -617,7 +813,7 @@ namespace Server.Controllers
                                      !string.IsNullOrEmpty(user.LastName) &&
                                      !string.IsNullOrEmpty(user.Bio);
             if (!completion.HasBasicInfo)
-                missingFields.AddRange(new[] { "FirstName", "LastName", "Bio" }.Where(f =>
+                missingFields.AddRange(sourceArray.Where(f =>
                     string.IsNullOrEmpty(typeof(User).GetProperty(f)?.GetValue(user)?.ToString())));
 
             // Contact Info Check
@@ -671,10 +867,10 @@ namespace Server.Controllers
         {
             var userId = GetUserId();
 
-            var clientCount = await _context.Clients.CountAsync(c => c.FreelancerId == userId);
+            var clientCount = await _context.Users.CountAsync(u => u.Role == "client");
             var projectCount = await _context.Projects
                 .Include(p => p.Client)
-                .CountAsync(p => p.Client!.FreelancerId == userId);
+                .CountAsync(p => p.Client!.Role == "client");
             var invoiceCount = await _context.Invoices.CountAsync(i => i.FreelancerId == userId);
             var totalRevenue = await _context.Invoices
                 .Where(i => i.FreelancerId == userId && i.Status == InvoiceStatus.Paid)
@@ -689,7 +885,7 @@ namespace Server.Controllers
 
             var hasActiveProjects = await _context.Projects
                 .Include(p => p.Client)
-                .AnyAsync(p => p.Client!.FreelancerId == userId && p.Deadline > DateTimeOffset.UtcNow);
+                .AnyAsync(p => p.Client!.Role == "client" && p.Deadline > DateTimeOffset.UtcNow);
 
             // Get profile completion and security status
             var user = await _context.Users
@@ -739,7 +935,7 @@ namespace Server.Controllers
                 TotalClients = clientCount,
                 ActiveProjects = await _context.Projects
                     .Include(p => p.Client)
-                    .CountAsync(p => p.Client!.FreelancerId == userId && p.Deadline > DateTimeOffset.UtcNow),
+                    .CountAsync(p => p.Client!.Role == "client" && p.Deadline > DateTimeOffset.UtcNow),
                 ThisMonthRevenue = await _context.Invoices
                     .Where(i => i.FreelancerId == userId && i.PaidAt.HasValue && i.PaidAt.Value >= firstDayOfMonth)
                     .SumAsync(i => (decimal?)i.Amount) ?? 0,
@@ -776,6 +972,50 @@ namespace Server.Controllers
             using var hmac = new HMACSHA512(passwordSalt);
             var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
             return computedHash.SequenceEqual(passwordHash);
+        }
+
+        // Helper method for invoice mapping
+        private static InvoiceDto MapToInvoiceDto(Invoice invoice)
+        {
+            return new InvoiceDto
+            {
+                Id = invoice.Id,
+                InvoiceNumber = invoice.InvoiceNumber,
+                Title = invoice.Title,
+                Description = invoice.Description,
+                Amount = invoice.Amount,
+                IssueDate = invoice.IssueDate,
+                DueDate = invoice.DueDate,
+                Status = invoice.Status.ToString(),
+                ProjectId = invoice.ProjectId,
+                ProjectTitle = invoice.Project?.Title ?? "N/A",
+                ClientId = invoice.ClientId,
+                ClientName = !string.IsNullOrEmpty(invoice.Client?.FirstName) && !string.IsNullOrEmpty(invoice.Client?.LastName)
+                    ? invoice.Client.FirstName + " " + invoice.Client.LastName
+                    : invoice.Client?.Username ?? "N/A",
+                CreatedAt = invoice.CreatedAt,
+                SentAt = invoice.SentAt,
+                PaidAt = invoice.PaidAt,
+                Items = invoice.Items?.Select(item => new InvoiceItemDto
+                {
+                    Id = item.Id,
+                    Description = item.Description,
+                    Quantity = item.Quantity,
+                    Rate = item.Rate,
+                    Total = item.Total
+                }).ToList() ?? [],
+                Payments = invoice.Payments?.Select(payment => new PaymentDto
+                {
+                    Id = payment.Id,
+                    Amount = payment.Amount,
+                    PaymentDate = payment.PaymentDate,
+                    Method = payment.Method.ToString(),
+                    Status = payment.Status.ToString(),
+                    TransactionId = payment.TransactionId,
+                    Notes = payment.Notes,
+                    CreatedAt = payment.CreatedAt
+                }).ToList() ?? []
+            };
         }
 
         #endregion
@@ -839,17 +1079,19 @@ namespace Server.Controllers
                                 (i.Status == InvoiceStatus.Sent || i.Status == InvoiceStatus.Overdue))
                         .Select(i => new
                         {
-                            InvoiceNumber = i.InvoiceNumber,
-                            ClientName = i.Client!.Name,
-                            Amount = i.Amount,
-                            Status = i.Status
+                            i.InvoiceNumber,
+                            ClientName = !string.IsNullOrEmpty(i.Client!.FirstName) && !string.IsNullOrEmpty(i.Client.LastName)
+                                ? i.Client.FirstName + " " + i.Client.LastName
+                                : i.Client.Username,
+                            i.Amount,
+                            i.Status
                         })
                         .ToListAsync();
 
                     return BadRequest(new
                     {
                         message = "Cannot delete account with unpaid invoices. Please resolve these first or use force delete.",
-                        unpaidInvoices = unpaidInvoices,
+                        unpaidInvoices,
                         canForceDelete = true
                     });
                 }
@@ -857,40 +1099,64 @@ namespace Server.Controllers
                 // Warn about active projects
                 var activeProjects = await _context.Projects
                     .Include(p => p.Client)
-                    .Where(p => p.Client!.FreelancerId == userId && p.Deadline > DateTimeOffset.UtcNow)
+                    .Where(p => p.Client!.Role == "client" && p.Deadline > DateTimeOffset.UtcNow)
                     .Select(p => new
                     {
-                        Title = p.Title,
-                        ClientName = p.Client!.Name,
-                        Deadline = p.Deadline
+                        p.Title,
+                        ClientName = !string.IsNullOrEmpty(p.Client!.FirstName) && !string.IsNullOrEmpty(p.Client.LastName)
+                            ? p.Client.FirstName + " " + p.Client.LastName
+                            : p.Client.Username,
+                        p.Deadline
                     })
                     .ToListAsync();
 
-                if (activeProjects.Any() && !dto.AcknowledgeDataLoss)
+                if (activeProjects.Count != 0 && !dto.AcknowledgeDataLoss)
                 {
                     return BadRequest(new
                     {
                         message = "You have active projects. Deleting your account will permanently remove all data.",
-                        activeProjects = activeProjects,
+                        activeProjects,
                         requiresAcknowledgment = true
                     });
                 }
             }
 
-            // For clients, just verify they understand data loss
-            if (user.Role == "client" && !dto.AcknowledgeDataLoss)
+            // For clients, check if they have active projects
+            if (user.Role == "client")
             {
-                return BadRequest(new
+                var clientProjects = await _context.Projects
+                    .Where(p => p.ClientId == userId && p.Deadline > DateTimeOffset.UtcNow)
+                    .Select(p => new
+                    {
+                        p.Title,
+                        p.Deadline
+                    })
+                    .ToListAsync();
+
+                if (clientProjects.Count != 0 && !dto.AcknowledgeDataLoss)
                 {
-                    message = "Deleting your account will permanently remove all your data. Please acknowledge to continue.",
-                    requiresAcknowledgment = true
-                });
+                    return BadRequest(new
+                    {
+                        message = "You have active projects. Deleting your account will permanently remove all data.",
+                        activeProjects = clientProjects,
+                        requiresAcknowledgment = true
+                    });
+                }
+
+                if (!dto.AcknowledgeDataLoss)
+                {
+                    return BadRequest(new
+                    {
+                        message = "Deleting your account will permanently remove all your data. Please acknowledge to continue.",
+                        requiresAcknowledgment = true
+                    });
+                }
             }
 
             return Ok(new
             {
                 message = "Account deletion request validated. Call the delete endpoint to proceed.",
-                userId = userId,
+                userId,
                 canProceed = true
             });
         }
@@ -918,76 +1184,135 @@ namespace Server.Controllers
             {
                 if (user.Role == "freelancer")
                 {
-                    // Get all clients for this freelancer
-                    var clientIds = await _context.Clients
-                        .Where(c => c.FreelancerId == userId)
-                        .Select(c => c.Id)
+                    // Delete all payments for invoices belonging to this freelancer
+                    var invoiceIds = await _context.Invoices
+                        .Where(i => i.FreelancerId == userId)
+                        .Select(i => i.Id)
                         .ToListAsync();
 
-                    if (clientIds.Any())
+                    if (invoiceIds.Count != 0)
                     {
-                        // Delete all payments for invoices belonging to this freelancer
-                        var invoiceIds = await _context.Invoices
+                        // Delete payments
+                        var payments = await _context.Payments
+                            .Where(p => invoiceIds.Contains(p.InvoiceId))
+                            .ToListAsync();
+                        _context.Payments.RemoveRange(payments);
+
+                        // Delete invoice items
+                        var invoiceItems = await _context.InvoiceItems
+                            .Where(ii => invoiceIds.Contains(ii.InvoiceId))
+                            .ToListAsync();
+                        _context.InvoiceItems.RemoveRange(invoiceItems);
+
+                        // Delete invoices
+                        var invoices = await _context.Invoices
                             .Where(i => i.FreelancerId == userId)
+                            .ToListAsync();
+                        _context.Invoices.RemoveRange(invoices);
+                    }
+
+                    // Delete project files for projects that will be affected
+                    var projectIds = await _context.Projects
+                        .Where(p => true) // All projects - you may want to filter by freelancer relationship
+                        .Select(p => p.Id)
+                        .ToListAsync();
+
+                    if (projectIds.Count != 0)
+                    {
+                        var projectFiles = await _context.ProjectFiles
+                            .Where(pf => projectIds.Contains(pf.ProjectId))
+                            .ToListAsync();
+                        _context.ProjectFiles.RemoveRange(projectFiles);
+                    }
+
+                    // Note: Projects are not deleted as they belong to clients
+                    // You may want to handle project ownership transfer here
+                }
+                else if (user.Role == "client")
+                {
+                    // For clients, delete their projects and associated data
+                    var clientProjectIds = await _context.Projects
+                        .Where(p => p.ClientId == userId)
+                        .Select(p => p.Id)
+                        .ToListAsync();
+
+                    if (clientProjectIds.Count != 0)
+                    {
+                        // Delete project files
+                        var projectFiles = await _context.ProjectFiles
+                            .Where(pf => clientProjectIds.Contains(pf.ProjectId))
+                            .ToListAsync();
+                        _context.ProjectFiles.RemoveRange(projectFiles);
+
+                        // Delete invoices and their associated data for client projects
+                        var clientInvoiceIds = await _context.Invoices
+                            .Where(i => i.ClientId == userId)
                             .Select(i => i.Id)
                             .ToListAsync();
 
-                        if (invoiceIds.Any())
+                        if (clientInvoiceIds.Count != 0)
                         {
-                            // Delete payments
                             var payments = await _context.Payments
-                                .Where(p => invoiceIds.Contains(p.InvoiceId))
+                                .Where(p => clientInvoiceIds.Contains(p.InvoiceId))
                                 .ToListAsync();
                             _context.Payments.RemoveRange(payments);
 
-                            // Delete invoice items
                             var invoiceItems = await _context.InvoiceItems
-                                .Where(ii => invoiceIds.Contains(ii.InvoiceId))
+                                .Where(ii => clientInvoiceIds.Contains(ii.InvoiceId))
                                 .ToListAsync();
                             _context.InvoiceItems.RemoveRange(invoiceItems);
 
-                            // Delete invoices
                             var invoices = await _context.Invoices
-                                .Where(i => i.FreelancerId == userId)
+                                .Where(i => i.ClientId == userId)
                                 .ToListAsync();
                             _context.Invoices.RemoveRange(invoices);
                         }
 
-                        // Delete project files
-                        var projectIds = await _context.Projects
-                            .Where(p => clientIds.Contains(p.ClientId))
-                            .Select(p => p.Id)
-                            .ToListAsync();
-
-                        if (projectIds.Any())
-                        {
-                            var projectFiles = await _context.ProjectFiles
-                                .Where(pf => projectIds.Contains(pf.ProjectId))
-                                .ToListAsync();
-                            _context.ProjectFiles.RemoveRange(projectFiles);
-                        }
-
                         // Delete projects
                         var projects = await _context.Projects
-                            .Where(p => clientIds.Contains(p.ClientId))
+                            .Where(p => p.ClientId == userId)
                             .ToListAsync();
                         _context.Projects.RemoveRange(projects);
-
-                        // Delete clients
-                        var clients = await _context.Clients
-                            .Where(c => c.FreelancerId == userId)
-                            .ToListAsync();
-                        _context.Clients.RemoveRange(clients);
                     }
                 }
-                // else if (user.Role == "client")
-                // {
-                // For clients, we would delete their specific data
-                // This depends on how you structure client-specific data
-                // For now, assuming clients don't have their own data to delete
-                // }
 
-                // Delete the user
+                // Delete user skills
+                var userSkills = await _context.UserSkills
+                    .Where(s => s.UserId == userId)
+                    .ToListAsync();
+                _context.UserSkills.RemoveRange(userSkills);
+
+                // Delete login history
+                var loginHistory = await _context.LoginHistories
+                    .Where(l => l.UserId == userId)
+                    .ToListAsync();
+                _context.LoginHistories.RemoveRange(loginHistory);
+
+                // Delete security audit logs
+                var securityLogs = await _context.SecurityAuditLogs
+                    .Where(s => s.UserId == userId)
+                    .ToListAsync();
+                _context.SecurityAuditLogs.RemoveRange(securityLogs);
+
+                // Delete conversation participants
+                var conversationParticipants = await _context.ConversationParticipants
+                    .Where(cp => cp.UserId == userId)
+                    .ToListAsync();
+                _context.ConversationParticipants.RemoveRange(conversationParticipants);
+
+                // Delete messages sent by the user
+                var userMessages = await _context.Messages
+                    .Where(m => m.SenderId == userId)
+                    .ToListAsync();
+                _context.Messages.RemoveRange(userMessages);
+
+                // Delete message reactions by the user
+                var messageReactions = await _context.MessageReactions
+                    .Where(mr => mr.UserId == userId)
+                    .ToListAsync();
+                _context.MessageReactions.RemoveRange(messageReactions);
+
+                // Finally, delete the user
                 _context.Users.Remove(user);
 
                 await _context.SaveChangesAsync();
@@ -1019,26 +1344,33 @@ namespace Server.Controllers
                     {
                         user.Username,
                         user.Email,
-                        user.Role
+                        user.Role,
+                        user.FirstName,
+                        user.LastName,
+                        user.Company
                     },
-                    Clients = await _context.Clients
-                        .Where(c => c.FreelancerId == userId)
-                        .Select(c => new
+                    Clients = await _context.Users
+                        .Where(u => u.Role == "client")
+                        .Select(u => new
                         {
-                            c.Name,
-                            c.Email,
-                            c.Company
+                            u.Username,
+                            u.Email,
+                            u.FirstName,
+                            u.LastName,
+                            u.Company
                         })
                         .ToListAsync(),
                     Projects = await _context.Projects
                         .Include(p => p.Client)
-                        .Where(p => p.Client!.FreelancerId == userId)
+                        .Where(p => p.Client!.Role == "client")
                         .Select(p => new
                         {
                             p.Title,
                             p.Description,
                             p.Deadline,
-                            ClientName = p.Client!.Name
+                            ClientName = !string.IsNullOrEmpty(p.Client!.FirstName) && !string.IsNullOrEmpty(p.Client.LastName)
+                                ? p.Client.FirstName + " " + p.Client.LastName
+                                : p.Client.Username
                         })
                         .ToListAsync(),
                     Invoices = await _context.Invoices
@@ -1054,7 +1386,9 @@ namespace Server.Controllers
                             i.Status,
                             i.IssueDate,
                             i.DueDate,
-                            ClientName = i.Client!.Name,
+                            ClientName = !string.IsNullOrEmpty(i.Client!.FirstName) && !string.IsNullOrEmpty(i.Client.LastName)
+                                ? i.Client.FirstName + " " + i.Client.LastName
+                                : i.Client.Username,
                             ProjectTitle = i.Project!.Title,
                             Items = i.Items.Select(item => new
                             {
@@ -1070,24 +1404,60 @@ namespace Server.Controllers
 
                 return Ok(exportData);
             }
-
-            return Ok(new
+            else // client role
             {
-                User = new
+                var exportData = new
                 {
-                    user.Username,
-                    user.Email,
-                    user.Role
-                },
-                ExportDate = DateTime.UtcNow
-            });
+                    User = new
+                    {
+                        user.Username,
+                        user.Email,
+                        user.Role,
+                        user.FirstName,
+                        user.LastName,
+                        user.Company
+                    },
+                    Projects = await _context.Projects
+                        .Where(p => p.ClientId == userId)
+                        .Select(p => new
+                        {
+                            p.Title,
+                            p.Description,
+                            p.Deadline
+                        })
+                        .ToListAsync(),
+                    Invoices = await _context.Invoices
+                        .Include(i => i.Items)
+                        .Where(i => i.ClientId == userId)
+                        .Select(i => new
+                        {
+                            i.InvoiceNumber,
+                            i.Title,
+                            i.Amount,
+                            i.Status,
+                            i.IssueDate,
+                            i.DueDate,
+                            Items = i.Items.Select(item => new
+                            {
+                                item.Description,
+                                item.Quantity,
+                                item.Rate,
+                                item.Total
+                            })
+                        })
+                        .ToListAsync(),
+                    ExportDate = DateTime.UtcNow
+                };
+
+                return Ok(exportData);
+            }
         }
 
         #region Advanced Security Features
 
         [HttpGet("security-audit-logs")]
         public async Task<ActionResult<List<SecurityAuditLogDto>>> GetSecurityAuditLogs(
-            [FromQuery] int page = 1, 
+            [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20)
         {
             var userId = GetUserId();
@@ -1143,11 +1513,11 @@ namespace Server.Controllers
 
                 var users = await _context.Users
                     .Where(u => u.Id != currentUserId &&
-                               (u.FirstName.ToLower().Contains(searchTerm) ||
-                                u.LastName.ToLower().Contains(searchTerm) ||
-                                u.Username.ToLower().Contains(searchTerm) ||
-                                u.Email.ToLower().Contains(searchTerm) ||
-                                (u.FirstName + " " + u.LastName).ToLower().Contains(searchTerm)))
+                               (u.FirstName.Contains(searchTerm, StringComparison.CurrentCultureIgnoreCase) ||
+                                u.LastName.Contains(searchTerm, StringComparison.CurrentCultureIgnoreCase) ||
+                                u.Username.Contains(searchTerm, StringComparison.CurrentCultureIgnoreCase) ||
+                                u.Email.Contains(searchTerm, StringComparison.CurrentCultureIgnoreCase) ||
+                                (u.FirstName + " " + u.LastName).Contains(searchTerm, StringComparison.CurrentCultureIgnoreCase)))
                     .OrderBy(u => u.FirstName)
                     .ThenBy(u => u.LastName)
                     .Take(limit)
@@ -1174,7 +1544,7 @@ namespace Server.Controllers
             {
                 return Unauthorized(new { message = "User not authenticated" });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500, new { message = "An error occurred while searching users" });
             }
