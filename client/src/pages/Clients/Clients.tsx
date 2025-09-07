@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import styles from "./Clients.module.css";
 import tableStyles from "../../components/Table/Table.module.css";
 import { useAuth } from "../../context/AuthContext";
-import ClientModal, { type Client as ClientModalType } from "../../components/modals/ClientModal/ClientModal";
 import Navbar from "../../components/Navbar/Navbar";
 import InvoiceViewModal, { type ViewableEntity } from "../../components/modals/InvoiceModal/InvoiceViewModal";
 import InvoiceModal, { type CreateInvoice, type Invoice as InvoiceModalType } from "../../components/modals/InvoiceModal/InvoiceModal";
@@ -12,7 +11,6 @@ import {
   Plus,
   Search,
   Eye,
-  Trash2,
   Mail,
   Building,
   FolderOpen,
@@ -20,8 +18,8 @@ import {
   RefreshCw,
   Download,
   BarChart3,
-  Edit,
-  DollarSign
+  DollarSign,
+  AlertCircle
 } from 'lucide-react';
 import axios from "../../api/axios";
 import { useNavigate } from "react-router-dom";
@@ -29,18 +27,27 @@ import ClientProjectsModal from "../../components/modals/ClientModal/ClientProje
 
 export type Client = {
   id: number;
-  name: string;
+  username: string;
   email: string;
+  firstName: string;
+  lastName: string;
   company: string;
+  role: string;
+  name: string;
   projectCount: number;
   invoiceCount: number;
   totalRevenue: number;
+  paidInvoiceAmount?: number;
+  lastActivity?: string;
+  isActive?: boolean;
 };
 
 type ClientStats = {
   totalClients: number;
   clientsWithProjects: number;
   clientsWithUnpaidInvoices: number;
+  activeClientsThisMonth: number;
+  newClientsThisMonth: number;
   topClientsByRevenue: Array<{
     clientName: string;
     totalRevenue: number;
@@ -108,10 +115,6 @@ export default function Clients() {
   const [sortBy, setSortBy] = useState<'name' | 'company' | 'email'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedClients, setSelectedClients] = useState<number[]>([]);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
-  const [showClientModal, setShowClientModal] = useState(false);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
 
   // State for projects modal
   const [showProjectsModal, setShowProjectsModal] = useState(false);
@@ -126,7 +129,6 @@ export default function Clients() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceModalType | null>(null);
   const [projectsForInvoiceModal, setProjectsForInvoiceModal] = useState<ProjectForInvoiceModal[]>([]);
-
 
   useEffect(() => {
     if (user?.role === "freelancer") {
@@ -151,21 +153,24 @@ export default function Clients() {
       setError("");
 
       const [clientsRes, projectsRes, invoicesRes] = await Promise.all([
-        axios.get<Client[]>("/clients"),
-        axios.get<any[]>("/projects"),
-        axios.get<any[]>("/invoices"),
+        axios.get("/User/clients"),
+        axios.get("/projects"),
+        axios.get("/invoices"),
       ]);
 
-      const enrichedClients = clientsRes.data.map(client => {
-        const clientProjects = projectsRes.data.filter(p => p.clientId === client.id);
-        const clientInvoices = invoicesRes.data.filter(inv => inv.clientId === client.id);
+      const enrichedClients = clientsRes.data.map((client: any) => {
+        const clientProjects = projectsRes.data.filter((p: any) => p.clientId === client.id);
+        const clientInvoices = invoicesRes.data.filter((inv: any) => inv.clientId === client.id);
 
         const projectCount = clientProjects.length;
         const invoiceCount = clientInvoices.length;
-        const totalRevenue = clientInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+        const totalRevenue = clientInvoices.reduce((sum: number, inv: any) => sum + (inv.amount || 0), 0);
 
         return { 
           ...client,
+          name: client.firstName && client.lastName 
+            ? `${client.firstName} ${client.lastName}` 
+            : client.username,
           projectCount,
           invoiceCount,
           totalRevenue
@@ -194,18 +199,18 @@ export default function Clients() {
 
   const fetchClientStats = async () => {
     try {
-      const response = await axios.get<ClientStats>("/clients/stats");
+      const response = await axios.get<ClientStats>("/User/clients/stats");
       setClientStats(response.data);
     } catch (err: any) {
       console.error("Fetch client stats error:", err);
     }
   };
 
-  // Fetch invoices for a specific client (unchanged)
+  // Fetch invoices for a specific client
   const fetchClientInvoices = async (clientId: number) => {
     try {
       setLoadingInvoices(true);
-      const response = await axios.get<Invoice[]>(`/clients/${clientId}/invoices`);
+      const response = await axios.get<Invoice[]>(`/User/clients/${clientId}/invoices`);
       setClientInvoices(response.data);
     } catch (err: any) {
       console.error("Fetch client invoices error:", err);
@@ -303,37 +308,6 @@ export default function Clients() {
     }
   };
 
-  const handleClientSubmit = async (clientData: Omit<ClientModalType, 'id'>) => {
-    try {
-      if (editingClient) {
-        // Edit existing client
-        const response = await axios.put(`/clients/${editingClient.id}`, clientData);
-        setClients(clients.map(c => c.id === editingClient.id ? response.data : c));
-      } else {
-        // Add new client
-        const response = await axios.post("/clients", clientData);
-        setClients([...clients, response.data]);
-      }
-      setShowClientModal(false);
-      setEditingClient(null);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to save client");
-    }
-  };
-
-  const handleDeleteClient = async () => {
-    if (!clientToDelete) return;
-
-    try {
-      await axios.delete(`/clients/${clientToDelete.id}`);
-      setClients(clients.filter(c => c.id !== clientToDelete.id));
-      setShowDeleteModal(false);
-      setClientToDelete(null);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to delete client");
-    }
-  };
-
   const handleSelectClient = (clientId: number | string) => {
     setSelectedClients(prev =>
       prev.includes(clientId as number)
@@ -371,11 +345,12 @@ export default function Clients() {
       gridColumnWidth: '2fr',
       render: (client) => (
         <div className={tableStyles.clientInfoCell}>
-          <div className={tableStyles.clientAvatar} style={{borderRadius: '50%' /* Override default 10px from Table.module.css */}}>
+          <div className={tableStyles.clientAvatar} style={{borderRadius: '50%'}}>
             {client.name.charAt(0).toUpperCase()}
           </div>
           <div className={tableStyles.clientDetails}>
             <span className={tableStyles.clientName}>{client.name}</span>
+            <span className={tableStyles.clientRole}>{client.username}</span>
           </div>
         </div>
       )
@@ -439,16 +414,6 @@ export default function Clients() {
             <Eye size={14} />
             View Projects ({client.projectCount})
           </button>
-          <button
-            className={tableStyles.dropdownItem}
-            onClick={() => {
-              setEditingClient(client);
-              setShowClientModal(true);
-            }}
-          >
-            <Edit size={14} />
-            Edit Client
-          </button>
           <button 
             className={tableStyles.dropdownItem}
             onClick={() => handleViewInvoices(client)}
@@ -456,16 +421,12 @@ export default function Clients() {
             <FileText size={14} />
             View Invoices ({client.invoiceCount})
           </button>
-          <hr className={tableStyles.dropdownDivider} />
           <button
-            className={`${tableStyles.dropdownItem} ${tableStyles.danger}`}
-            onClick={() => {
-              setClientToDelete(client);
-              setShowDeleteModal(true);
-            }}
+            className={tableStyles.dropdownItem}
+            onClick={() => handleOpenCreateInvoice(client)}
           >
-            <Trash2 size={14} />
-            Delete Client
+            <Plus size={14} />
+            Create Invoice
           </button>
         </>
       )
@@ -483,18 +444,9 @@ export default function Clients() {
       <p className={tableStyles.emptyDescription}>
         {searchTerm
           ? "Try adjusting your search terms to find the client you're looking for."
-          : "Start building your client base by adding your first client. You can manage their projects, invoices, and communications all in one place."
+          : "Clients will appear here automatically as you work with them. Create projects and send invoices to start building your client relationships."
         }
       </p>
-      {!searchTerm && (
-        <button
-          className={tableStyles.emptyAction}
-          onClick={() => setShowClientModal(true)}
-        >
-          <Plus size={16} />
-          Add Your First Client
-        </button>
-      )}
     </>
   );
 
@@ -551,13 +503,6 @@ export default function Clients() {
                 <RefreshCw size={16} />
                 Refresh
               </button>
-              <button
-                className={`${styles.actionButton} ${styles.primaryAction}`}
-                onClick={() => setShowClientModal(true)}
-              >
-                <Plus size={16} />
-                Add Client
-              </button>
             </div>
           </div>
         </header>
@@ -603,6 +548,28 @@ export default function Clients() {
                 <BarChart3 size={24} />
               </div>
               <div className={styles.statInfo}>
+                <h3 className={styles.statLabel}>Active This Month</h3>
+                <p className={styles.statValue}>{clientStats.activeClientsThisMonth}</p>
+                <span className={styles.statSubtext}>Monthly engagement</span>
+              </div>
+            </div>
+
+            <div className={styles.statCard}>
+              <div className={styles.statIcon}>
+                <Plus size={24} />
+              </div>
+              <div className={styles.statInfo}>
+                <h3 className={styles.statLabel}>New This Month</h3>
+                <p className={styles.statValue}>{clientStats.newClientsThisMonth}</p>
+                <span className={styles.statSubtext}>Growth rate</span>
+              </div>
+            </div>
+
+            <div className={styles.statCard}>
+              <div className={styles.statIcon}>
+                <DollarSign size={24} />
+              </div>
+              <div className={styles.statInfo}>
                 <h3 className={styles.statLabel}>Top Performer</h3>
                 <p className={styles.statValue}>
                   {clientStats.topClientsByRevenue[0]?.clientName || "N/A"}
@@ -617,6 +584,15 @@ export default function Clients() {
             </div>
           </div>
         )}
+
+        {/* Notice about automatic client management */}
+        <div className={styles.infoNotice}>
+          <AlertCircle size={20} />
+          <div className={styles.noticeContent}>
+            <strong>Automatic Client Management:</strong> Clients are automatically added when you create projects or send invoices. 
+            You can view their details, projects, and invoices here.
+          </div>
+        </div>
 
         {/* Search and Filters */}
         <div className={styles.controlsBar}>
@@ -642,10 +618,6 @@ export default function Clients() {
                   <Download size={16} />
                   Export
                 </button>
-                <button className={styles.bulkButton}>
-                  <Trash2 size={16} />
-                  Delete
-                </button>
               </div>
             )}
           </div>
@@ -663,18 +635,6 @@ export default function Clients() {
           sortOrder={sortOrder}
           emptyStateContent={emptyClientsState}
           getRowId={(client) => client.id}
-        />
-
-        {/* Client Modal */}
-        <ClientModal
-          isOpen={showClientModal}
-          onClose={() => {
-            setShowClientModal(false);
-            setEditingClient(null);
-          }}
-          onSubmit={handleClientSubmit}
-          client={editingClient}
-          mode={editingClient ? 'edit' : 'add'}
         />
 
         {/* Invoice View Modal */}
@@ -722,45 +682,6 @@ export default function Clients() {
             mode={editingInvoice ? 'edit' : 'add'}
             initialClientId={selectedClient?.id || undefined}
           />
-        )}
-
-        {/* Delete Confirmation Modal */}
-        {showDeleteModal && clientToDelete && (
-          <div className={styles.modalOverlay} onClick={() => setShowDeleteModal(false)}>
-            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-              <header className={styles.modalHeader}>
-                <h2 className={styles.modalTitle}>
-                  <Trash2 size={24} />
-                  Delete Client
-                </h2>
-              </header>
-
-              <div className={styles.modalContent}>
-                <p className={styles.confirmationText}>
-                  Are you sure you want to delete <strong>{clientToDelete.name}</strong>?
-                </p>
-                <p className={styles.warningText}>
-                  This action cannot be undone. All associated projects and data will also be removed.
-                </p>
-              </div>
-
-              <div className={styles.modalActions}>
-                <button
-                  className={`${styles.actionButton} ${styles.secondaryAction}`}
-                  onClick={() => setShowDeleteModal(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  className={`${styles.actionButton} ${styles.dangerAction}`}
-                  onClick={handleDeleteClient}
-                >
-                  <Trash2 size={16} />
-                  Delete Client
-                </button>
-              </div>
-            </div>
-          </div>
         )}
 
         {error && (
