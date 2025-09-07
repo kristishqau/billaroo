@@ -325,24 +325,22 @@ namespace Server.Controllers
             try
             {
                 var user = await _context.Users
+                    .IgnoreQueryFilters()
                     .FirstOrDefaultAsync(u => u.Email == request.Email);
 
-                // Always return success to prevent email enumeration
                 if (user == null)
                 {
                     return Ok(new { message = "If an account with that email exists, a password reset link has been sent." });
                 }
 
-                // Generate reset token
                 var resetToken = GenerateResetToken();
-                var resetTokenExpiry = DateTime.UtcNow.AddHours(24); // Token expires in 24 hours
+                var resetTokenExpiry = DateTime.UtcNow.AddHours(24);
 
                 user.PasswordResetToken = resetToken;
                 user.PasswordResetTokenExpiry = resetTokenExpiry;
 
                 await _context.SaveChangesAsync();
 
-                // Send password reset email
                 await SendPasswordResetEmail(user.Email, resetToken);
 
                 return Ok(new { message = "If an account with that email exists, a password reset link has been sent." });
@@ -360,6 +358,7 @@ namespace Server.Controllers
             try
             {
                 var user = await _context.Users
+                    .IgnoreQueryFilters()  // This bypasses global filters
                     .FirstOrDefaultAsync(u => u.PasswordResetToken == request.Token);
 
                 if (user == null || user.PasswordResetTokenExpiry < DateTime.UtcNow)
