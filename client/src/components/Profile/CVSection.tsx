@@ -12,7 +12,7 @@ interface CVSectionProps {
   uploading: boolean;
   notification: UseNotificationReturn;
 }
-const BACKEND_URL = import.meta.env.VITE_API_BASE_URL.replace("/api", "");
+const BACKEND_URL = import.meta.env.VITE_API_BASE_URL.replace(/\/api\/?$/, ""); 
 const CVSection: React.FC<CVSectionProps> = ({
   profile,
   formatDate,

@@ -30,7 +30,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 }) => {
   // Hook to track window width for responsiveness
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
-  const BACKEND_URL = import.meta.env.VITE_API_BASE_URL.replace("/api", "");
+  const BACKEND_URL = import.meta.env.VITE_API_BASE_URL.replace(/\/api\/?$/, ""); 
   useEffect(() => {
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
