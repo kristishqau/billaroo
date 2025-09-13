@@ -46,6 +46,19 @@ if (isProduction)
     builder.Configuration["AppSettings:Issuer"] = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "ClientPortalAPI";
     builder.Configuration["AppSettings:Audience"] = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "ClientPortalUsers";
 
+    // Frontend URL Configuration
+    var frontendUrl = Environment.GetEnvironmentVariable("FRONTEND_URL");
+    if (!string.IsNullOrEmpty(frontendUrl))
+    {
+        builder.Configuration["AppSettings:FrontendUrl"] = frontendUrl;
+        Console.WriteLine($"✅ Frontend URL loaded: {frontendUrl}");
+    }
+    else
+    {
+        builder.Configuration["AppSettings:FrontendUrl"] = "https://billaroo.netlify.app";
+        Console.WriteLine("⚠️ Using default production frontend URL");
+    }
+
     // Data Protection - Create directory if it doesn't exist
     var keyPath = "/app/keys";
     Directory.CreateDirectory(keyPath);
@@ -89,6 +102,11 @@ if (isProduction)
         builder.Configuration["CorsSettings:AllowedOrigins:1"] = "https://www.yourdomain.com";
         Console.WriteLine("⚠️ Using fallback CORS origins");
     }
+}
+else
+{
+    // Development configuration
+    builder.Configuration["AppSettings:FrontendUrl"] = "http://localhost:5173";
 }
 
 // ---------- Services ----------
@@ -323,6 +341,7 @@ app.MapGet("/health", (HttpContext context) =>
         Timestamp = DateTime.UtcNow,
         DatabaseConfigured = !string.IsNullOrEmpty(builder.Configuration.GetConnectionString("DefaultConnection")),
         JwtConfigured = !string.IsNullOrEmpty(jwtKey),
+        FrontendUrl = builder.Configuration["AppSettings:FrontendUrl"],
         RequestScheme = context.Request.Scheme,
         RequestHost = context.Request.Host.ToString(),
         UserAgent = context.Request.Headers.UserAgent.ToString()

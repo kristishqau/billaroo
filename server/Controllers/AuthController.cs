@@ -21,13 +21,15 @@ namespace Server.Controllers
         private readonly IAuthService _authService;
         private readonly IEmailService _emailService;
         private readonly ISecurityAuditService _securityAuditService;
+        private readonly IConfiguration _configuration;
 
-        public AuthController(AppDbContext context, IAuthService authService, IEmailService emailService, ISecurityAuditService securityAuditService)
+        public AuthController(AppDbContext context, IAuthService authService, IEmailService emailService, ISecurityAuditService securityAuditService, IConfiguration configuration)
         {
             _context = context;
             _authService = authService;
             _emailService = emailService;
             _securityAuditService = securityAuditService;
+            _configuration = configuration;
         }
 
         [HttpPost("register")]
@@ -715,7 +717,7 @@ namespace Server.Controllers
 
         private async Task SendPasswordResetEmail(string email, string resetToken)
         {
-            var frontendBaseUrl = "http://localhost:5173";
+            var frontendBaseUrl = GetFrontendBaseUrl();
             var resetLink = $"{frontendBaseUrl}/reset-password?token={resetToken}";
             var subject = "Password Reset - Billaroo";
             var body = $@"
@@ -737,7 +739,7 @@ namespace Server.Controllers
 
         private async Task SendVerificationEmail(string email, string verificationToken)
         {
-            var frontendBaseUrl = "http://localhost:5173"; // Use frontend URL
+            var frontendBaseUrl = GetFrontendBaseUrl();
             var verificationLink = $"{frontendBaseUrl}/verify-email?token={verificationToken}";
             var subject = "Email Verification - Billaroo";
             var body = $@"
@@ -825,6 +827,11 @@ namespace Server.Controllers
                 return "Linux PC";
 
             return "Desktop";
+        }
+
+        private string GetFrontendBaseUrl()
+        {
+            return _configuration["AppSettings:FrontendUrl"] ?? "http://localhost:5173";
         }
 
         private async Task<string?> GetLocationFromIp(string? ipAddress)
