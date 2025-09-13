@@ -12,7 +12,7 @@ interface CVSectionProps {
   uploading: boolean;
   notification: UseNotificationReturn;
 }
-const apiUrl = import.meta.env.VITE_API_BASE_URL;
+const BACKEND_URL = import.meta.env.VITE_API_BASE_URL.replace("/api", "");
 const CVSection: React.FC<CVSectionProps> = ({
   profile,
   formatDate,
@@ -40,7 +40,7 @@ const CVSection: React.FC<CVSectionProps> = ({
           {profile?.cvUrl && (
             <div style={{ marginTop: 'var(--spacing-sm)' }}>
               <a 
-                href={`${apiUrl}${profile.cvUrl}`}
+                href={`${BACKEND_URL}${profile.cvUrl}`}
                 target="_blank" 
                 rel="noopener noreferrer"
                 className={styles.exportButton}

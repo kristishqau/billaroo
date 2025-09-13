@@ -30,7 +30,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 }) => {
   // Hook to track window width for responsiveness
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
-  const apiUrl = import.meta.env.VITE_API_BASE_URL;
+  const BACKEND_URL = import.meta.env.VITE_API_BASE_URL.replace("/api", "");
   useEffect(() => {
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
@@ -160,7 +160,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           <div className={styles.profileAvatar}>
             {profile?.profileImageUrl ? (
               <img 
-                src={`${apiUrl}${profile.profileImageUrl}`}
+                src={`${BACKEND_URL}${profile.profileImageUrl}`}
                 alt="Profile" 
                 style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
                 onError={(e) => {
