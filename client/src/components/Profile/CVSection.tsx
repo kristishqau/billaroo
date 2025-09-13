@@ -40,7 +40,7 @@ const CVSection: React.FC<CVSectionProps> = ({
           {profile?.cvUrl && (
             <div style={{ marginTop: 'var(--spacing-sm)' }}>
               <a 
-                href={`https://localhost:7263${profile.cvUrl}`}
+                href={`${profile.cvUrl}`}
                 target="_blank" 
                 rel="noopener noreferrer"
                 className={styles.exportButton}

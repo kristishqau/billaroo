@@ -160,7 +160,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           <div className={styles.profileAvatar}>
             {profile?.profileImageUrl ? (
               <img 
-                src={`https://localhost:7263${profile.profileImageUrl}`}
+                src={`${profile.profileImageUrl}`}
                 alt="Profile" 
                 style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
                 onError={(e) => {
